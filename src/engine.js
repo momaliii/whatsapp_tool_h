@@ -28,6 +28,7 @@ class Engine extends EventEmitter {
     this.lastRunResults = [];
     this.botStore = fileStore();
     this.botLastHandled = new Map(); // jid -> timestamp (cooldown)
+    this._handledMsgs = new Set(); // message ids already processed (dedupe across events)
     this.scheduledAt = null;
     try {
       const s = JSON.parse(fs.readFileSync(dataPath("schedule.json"), "utf8"));
@@ -119,10 +120,14 @@ class Engine extends EventEmitter {
       this.log("info", `Connected as ${this.me.name || this.me.number}.`);
     });
 
-    // incoming messages → auto-reply / flow bot
-    client.on("message", (msg) => {
+    // incoming messages → auto-reply / flow bot.
+    // We listen to BOTH events because `message` is unreliable on some
+    // WhatsApp Web builds; `message_create` fires for received messages too.
+    // handleIncoming dedupes by message id and ignores our own (fromMe).
+    const onMsg = (msg) =>
       this.handleIncoming(msg).catch((e) => this.log("error", "bot: " + (e.message || e)));
-    });
+    client.on("message", onMsg);
+    client.on("message_create", onMsg);
 
     client.on("auth_failure", (m) => this.log("error", "Auth failure: " + m));
     client.on("disconnected", (r) => {
@@ -213,6 +218,14 @@ class Engine extends EventEmitter {
     const from = msg.from || "";
     if (msg.fromMe || msg.isStatus) return; // ignore own / status updates silently
     if (!from.endsWith("@c.us") && !from.endsWith("@g.us")) return; // not a normal chat
+
+    // dedupe: the same message can arrive via both `message` and `message_create`
+    const id = msg.id?._serialized || msg.id?.id;
+    if (id) {
+      if (this._handledMsgs.has(id)) return;
+      this._handledMsgs.add(id);
+      if (this._handledMsgs.size > 2000) this._handledMsgs = new Set([...this._handledMsgs].slice(-1000));
+    }
 
     const name = msg._data?.notifyName || "";
     const who = name || from.replace("@c.us", "");
