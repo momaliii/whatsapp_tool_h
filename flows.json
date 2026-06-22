@@ -1,0 +1,50 @@
+{
+  "_comment": "Interactive menu bot. Each flow: trigger (keywords) starts it; steps drive the conversation. Step keys: send[] (messages to send on entry), options[] (wait for a reply, branch by match/number), collect (save the reply into a variable, then go next), next (auto-advance after sending), end (finish), fallback (reply when no option matches). Send item types: text, image, video, document, voice. Variables like {{name}} and collected vars like {{question}} work in text/caption.",
+  "flows": [
+    {
+      "id": "main",
+      "name": "Main menu",
+      "enabled": true,
+      "trigger": { "keywords": ["menu", "hi", "hello", "start", "help"], "match": "contains" },
+      "start": "welcome",
+      "steps": {
+        "welcome": {
+          "send": [
+            { "type": "text", "text": "Hi {{name}}! 👋 How can we help you today?\n\n1️⃣ Our products\n2️⃣ Talk to support\n3️⃣ Opening hours\n\n_Reply with a number._" }
+          ],
+          "options": [
+            { "match": ["1", "products", "product", "catalog"], "next": "products" },
+            { "match": ["2", "support", "help", "agent"], "next": "support" },
+            { "match": ["3", "hours", "time", "open"], "next": "hours" }
+          ],
+          "fallback": { "type": "text", "text": "Please reply with 1, 2 or 3 🙂" }
+        },
+        "products": {
+          "send": [
+            { "type": "text", "text": "Great choice! Here's our latest catalog 📦\nReply *menu* anytime to start over." }
+          ],
+          "end": true
+        },
+        "support": {
+          "send": [
+            { "type": "text", "text": "Sure 🙌 Please type your question and our team will get back to you." }
+          ],
+          "collect": "question",
+          "next": "support_done"
+        },
+        "support_done": {
+          "send": [
+            { "type": "text", "text": "Thank you {{name}}! ✅ We received your message:\n\n\"{{question}}\"\n\nOur team will reply within 24h. 🙏" }
+          ],
+          "end": true
+        },
+        "hours": {
+          "send": [
+            { "type": "text", "text": "🕘 We're open *Sun–Thu, 9am–6pm*.\nReply *menu* to go back." }
+          ],
+          "end": true
+        }
+      }
+    }
+  ]
+}

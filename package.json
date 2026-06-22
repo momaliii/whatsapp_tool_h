@@ -1,0 +1,28 @@
+{
+  "name": "watitool",
+  "version": "1.0.0",
+  "description": "Safe, human-like bulk WhatsApp sender (no Cloud API). Supports text, image/video/file captions, typing presence, smart delays and a live progress bar.",
+  "type": "module",
+  "bin": {
+    "watitool": "index.js"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "dashboard": "node server.js",
+    "send": "node index.js send",
+    "check": "node index.js check",
+    "login": "node index.js login"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "cli-progress": "^3.12.0",
+    "csv-parse": "^5.5.6",
+    "express": "^4.19.2",
+    "multer": "^1.4.5-lts.1",
+    "qrcode": "^1.5.4",
+    "qrcode-terminal": "^0.12.0",
+    "whatsapp-web.js": "^1.26.0"
+  }
+}

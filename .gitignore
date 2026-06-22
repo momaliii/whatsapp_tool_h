@@ -1,0 +1,11 @@
+node_modules/
+.wwebjs_auth/
+.wwebjs_cache/
+results.csv
+media/*
+!media/.gitkeep
+.env
+bot-state.json
+bot-log.jsonl
+schedule.json
+.DS_Store

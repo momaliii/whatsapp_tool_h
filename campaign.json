@@ -1,0 +1,16 @@
+{
+  "_comment": "Defines WHAT to send. Each array item is one full message (can be multi-line); one is picked at random per contact. Variables: {{name}} or any CSV column; built-ins {{firstname}} {{greeting}} {{date}} {{time}} {{day}} {{month}} {{year}}; {{random}} or {{random:1000-9999}} or {{random:a|b|c}}; and inline spintax like {hi|hey|hello}. Random & spintax are re-rolled for every message. Date formatting follows config.json -> vars.locale/timezone.",
+  "message": [
+    "Hi {{name}}! 👋 Just wanted to share a quick update with you.",
+    "Hey {{name}}, hope you're doing well 🙂 quick note for you below.",
+    "Hello {{name}}! 👋 Here's something I thought you'd want to see.{{firstname}}{{date}}",
+    "{hi|hey|hello}\n{{random:1000-9999}}\n{{random}}"
+  ],
+  "media": {
+    "enabled": false,
+    "path": "./media/sample.jpg",
+    "_help": "Set enabled=true and point path to an image, video, pdf, or any file. If it's an image/video the 'message' above becomes its caption. Documents are sent as a file with the message as a separate text (see sendCaptionAsSeparateText)."
+  },
+  "sendCaptionAsSeparateText": false,
+  "_sendCaptionAsSeparateText_help": "If true, the text is sent as its own message AFTER the media instead of as a caption. Required for file types that don't support captions."
+}

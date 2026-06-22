@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>watitool — Sign in</title>
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    body { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+    .login {
+      background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+      padding: 32px; width: 320px; max-width: 90vw; text-align: center;
+    }
+    .login h1 { margin: 0 0 4px; font-size: 22px; }
+    .login p { color: var(--muted); margin: 0 0 20px; font-size: 13px; }
+    .login input { margin-bottom: 12px; text-align: center; }
+    .login .btn { width: 100%; justify-content: center; }
+    .err { color: var(--red); font-size: 13px; min-height: 18px; margin-top: 10px; }
+  </style>
+</head>
+<body>
+  <form class="login" id="form">
+    <h1>📲 watitool</h1>
+    <p>Enter the password to continue</p>
+    <input type="password" id="pw" placeholder="Password" autofocus autocomplete="current-password" />
+    <button class="btn primary" type="submit">Sign in</button>
+    <div class="err" id="err"></div>
+  </form>
+  <script>
+    const form = document.getElementById("form");
+    form.onsubmit = async (e) => {
+      e.preventDefault();
+      document.getElementById("err").textContent = "";
+      const password = document.getElementById("pw").value;
+      const r = await fetch("/api/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password }),
+      });
+      if (r.ok) location.href = "/";
+      else document.getElementById("err").textContent = "Wrong password — try again.";
+    };
+  </script>
+</body>
+</html>

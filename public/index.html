@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>watitool — WhatsApp Sender Dashboard</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">📲 <strong>watitool</strong> <span>dashboard</span></div>
+    <div class="conn" id="conn">
+      <span class="dot" id="connDot"></span>
+      <span id="connText">checking…</span>
+      <button class="btn ghost lock" id="btnSignout" title="Sign out of dashboard" hidden>🔒 Sign out</button>
+    </div>
+  </header>
+
+  <nav class="tabs">
+    <button class="tab active" data-tab="connect">1 · Connection</button>
+    <button class="tab" data-tab="contacts">2 · Contacts</button>
+    <button class="tab" data-tab="message">3 · Message</button>
+    <button class="tab" data-tab="settings">4 · Settings</button>
+    <button class="tab" data-tab="send">5 · Send</button>
+    <button class="tab" data-tab="insights">📊 Insights</button>
+    <button class="tab" data-tab="autoreply">🤖 Auto-reply</button>
+    <button class="tab" data-tab="flows">💬 Flows</button>
+  </nav>
+
+  <main>
+    <!-- CONNECTION -->
+    <section class="panel active" id="tab-connect">
+      <h2>Connect your WhatsApp</h2>
+      <p class="muted">Scan the QR once with your phone: WhatsApp → <em>Linked Devices</em> → <em>Link a device</em>. The session is saved, so you won't need to scan again.</p>
+      <div class="connect-grid">
+        <div class="qrbox" id="qrbox">
+          <div class="qr-placeholder" id="qrPlaceholder">Click “Connect” to generate a QR code</div>
+          <img id="qrImg" alt="QR code" hidden />
+        </div>
+        <div class="connect-info">
+          <div class="status-line">Status: <b id="stateLabel">—</b></div>
+          <div class="status-line" id="meLine" hidden>Account: <b id="meName"></b> <span class="muted" id="meNumber"></span></div>
+          <div class="btnrow">
+            <button class="btn primary" id="btnConnect">Connect</button>
+            <button class="btn danger" id="btnLogout">Log out</button>
+          </div>
+          <p class="hint">A headless browser session runs on this machine. Keep this app open while sending.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- CONTACTS -->
+    <section class="panel" id="tab-contacts">
+      <h2>Contacts</h2>
+      <p class="muted">CSV with a <code>number</code> column (required) plus any columns you want as <code>{{placeholders}}</code> — e.g. <code>name</code>. Numbers can be local or international.</p>
+      <div class="btnrow">
+        <label class="btn">Import CSV<input type="file" id="csvFile" accept=".csv" hidden /></label>
+        <button class="btn" id="btnValidate">Validate numbers</button>
+        <span class="muted" id="contactCount"></span>
+      </div>
+      <textarea id="contactsArea" spellcheck="false" rows="14" placeholder="number,name&#10;201001234567,Ahmed"></textarea>
+      <div class="btnrow">
+        <button class="btn primary" id="btnSaveContacts">Save contacts</button>
+        <span class="saved" id="contactsSaved"></span>
+      </div>
+      <div id="validateOut" class="validate-out"></div>
+    </section>
+
+    <!-- MESSAGE -->
+    <section class="panel" id="tab-message">
+      <h2>Message &amp; media</h2>
+      <p class="muted">Messages can be multi-line. Want several wordings? Separate variants with a line containing only <code>---</code> and one is picked at random per contact (looks less automated). Use <code>{{name}}</code> or any CSV column.</p>
+      <textarea id="messageArea" rows="7" placeholder="Hi {{name}} 👋&#10;Hope you're well!&#10;---&#10;Hey {{name}}, quick note 🙂"></textarea>
+
+      <div class="vars">
+        <span class="vars-label">Insert variable:</span>
+        <button class="chip" data-ins="{{name}}">name</button>
+        <button class="chip" data-ins="{{firstname}}">firstname</button>
+        <button class="chip" data-ins="{{greeting}}">greeting</button>
+        <button class="chip" data-ins="{{date}}">date</button>
+        <button class="chip" data-ins="{{time}}">time</button>
+        <button class="chip" data-ins="{{day}}">day</button>
+        <button class="chip" data-ins="{{month}}">month</button>
+        <button class="chip" data-ins="{{random}}">random #</button>
+        <button class="chip" data-ins="{{random:1000-9999}}">random 1000-9999</button>
+        <button class="chip" data-ins="{hi|hey|hello}">{a|b|c} choice</button>
+      </div>
+      <p class="hint">Use any column from your CSV too, e.g. <code>{{city}}</code>. Built-ins are filled in per message — random &amp; spintax pick fresh each send.</p>
+
+      <div class="media-row">
+        <label class="btn">Attach media<input type="file" id="mediaFile" hidden /></label>
+        <span id="mediaName" class="muted">No media — text only</span>
+        <button class="btn ghost" id="btnClearMedia" hidden>Remove</button>
+      </div>
+      <label class="check"><input type="checkbox" id="captionSeparate" /> Send text as a separate message after the file (use for PDFs/docs that can't have a caption)</label>
+
+      <div class="preview">
+        <div class="preview-label">Preview <span class="muted" id="previewWhich"></span> <button class="chip" id="btnReroll" title="Re-roll random & spintax">🎲 shuffle</button></div>
+        <div class="bubble" id="preview">—</div>
+      </div>
+
+      <div class="btnrow">
+        <button class="btn primary" id="btnSaveMessage">Save message</button>
+        <span class="saved" id="messageSaved"></span>
+      </div>
+    </section>
+
+    <!-- SETTINGS -->
+    <section class="panel" id="tab-settings">
+      <h2>Sending settings</h2>
+      <p class="muted">Defaults are deliberately slow &amp; safe. Faster = higher ban risk.</p>
+      <div class="grid2">
+        <label>Default country code <input type="number" id="cfg_cc" /></label>
+        <span></span>
+        <label>Delay min (sec) <input type="number" id="cfg_dmin" /></label>
+        <label>Delay max (sec) <input type="number" id="cfg_dmax" /></label>
+        <label>Batch size <input type="number" id="cfg_bsize" /></label>
+        <label>Batch rest (min) <input type="number" id="cfg_brest" /></label>
+        <label>Max per run (0 = no cap) <input type="number" id="cfg_cap" /></label>
+        <label>Typing speed (chars/sec) <input type="number" id="cfg_cps" /></label>
+      </div>
+      <div class="checks">
+        <label class="check"><input type="checkbox" id="cfg_typing" /> Show “typing…” indicator</label>
+        <label class="check"><input type="checkbox" id="cfg_check" /> Skip numbers not on WhatsApp</label>
+        <label class="check"><input type="checkbox" id="cfg_skip" /> Skip numbers already messaged (resume)</label>
+        <label class="check"><input type="checkbox" id="cfg_online" /> Stay “online” while sending</label>
+      </div>
+
+      <h3>Date &amp; time</h3>
+      <p class="muted">Controls the <code>{{date}}</code>/<code>{{time}}</code> variables and the sending window below. Set this to your timezone — important when hosted on a server (which is usually UTC).</p>
+      <div class="grid2">
+        <label>Timezone <select id="cfg_tz"></select></label>
+        <label>Locale (date format) <input id="cfg_locale" placeholder="e.g. en-US, ar-EG" /></label>
+      </div>
+      <div class="btnrow" style="margin-top:6px">
+        <button class="btn ghost" id="btnTzBrowser">Use my browser timezone</button>
+        <span class="muted" id="tzClock"></span>
+      </div>
+
+      <h3>Sending window</h3>
+      <p class="muted">Only send between these hours (in the timezone above). A long campaign pauses outside the window — so it never messages people in the middle of the night.</p>
+      <div class="checks">
+        <label class="check"><input type="checkbox" id="cfg_winEnabled" /> Limit sending to a daily window</label>
+      </div>
+      <div class="grid2">
+        <label>From <input type="time" id="cfg_winStart" /></label>
+        <label>To <input type="time" id="cfg_winEnd" /></label>
+      </div>
+
+      <div class="btnrow">
+        <button class="btn primary" id="btnSaveSettings">Save settings</button>
+        <span class="saved" id="settingsSaved"></span>
+      </div>
+    </section>
+
+    <!-- SEND -->
+    <section class="panel" id="tab-send">
+      <h2>Send campaign</h2>
+
+      <div class="eta">
+        <div class="eta-main">
+          <span class="eta-label">Estimated time</span>
+          <span class="eta-val" id="etaVal">—</span>
+          <span class="eta-sub" id="etaSub"></span>
+        </div>
+        <div class="eta-calc">
+          for <input type="number" id="etaCount" min="1" placeholder="list" style="width:90px" /> contacts
+          <button class="btn ghost" id="etaUseList">use my list</button>
+        </div>
+        <div class="eta-detail muted" id="etaDetail"></div>
+        <div class="tune">
+          <span class="muted">Too long? Finish in</span>
+          <input type="number" id="tuneHours" min="0.5" step="0.5" placeholder="hrs" style="width:70px" />
+          <span class="muted">hours</span>
+          <button class="btn ghost" id="btnTune">Suggest settings</button>
+          <div class="tune-out" id="tuneOut"></div>
+        </div>
+      </div>
+
+      <div class="sched">
+        <div class="sched-row">
+          <span class="eta-label">Schedule start</span>
+          <input type="datetime-local" id="schedAt" />
+          <button class="btn" id="btnSchedule">Schedule</button>
+        </div>
+        <div class="sched-status" id="schedStatus"></div>
+        <p class="hint">Auto-starts the campaign at the chosen time (must be connected then). Tip: pair with a sending window in Settings so a long send only runs during the day.</p>
+      </div>
+
+      <div class="btnrow">
+        <button class="btn" id="btnDryRun">Dry run (no real sends)</button>
+        <button class="btn primary" id="btnStart">Start sending</button>
+        <button class="btn danger" id="btnStop" disabled>Stop</button>
+        <button class="btn ghost" id="btnClearResults">Reset history</button>
+      </div>
+
+      <div class="progress-wrap">
+        <div class="progress"><div class="bar" id="bar"></div></div>
+        <div class="progress-meta">
+          <span id="progCount">0 / 0</span>
+          <span class="pills">
+            <span class="pill ok">✓ <b id="sSent">0</b></span>
+            <span class="pill bad">✗ <b id="sFailed">0</b></span>
+            <span class="pill warn">⊘ <b id="sSkipped">0</b></span>
+          </span>
+          <span id="phase" class="phase">idle</span>
+        </div>
+      </div>
+
+      <div class="cols">
+        <div>
+          <h3>Live log</h3>
+          <div class="log" id="log"></div>
+        </div>
+        <div>
+          <h3>Results</h3>
+          <div class="results" id="results"></div>
+        </div>
+      </div>
+    </section>
+    <!-- INSIGHTS -->
+    <section class="panel" id="tab-insights">
+      <div class="ins-head">
+        <h2>Insights</h2>
+        <div class="ins-actions">
+          <div class="range" id="rangeBtns">
+            <button data-days="7">7d</button>
+            <button data-days="30" class="active">30d</button>
+            <button data-days="90">90d</button>
+          </div>
+          <a class="btn ghost" href="/api/export" download title="Download results.csv">⬇ Export</a>
+          <button class="btn ghost" id="btnRefreshIns">↻ Refresh</button>
+        </div>
+      </div>
+      <div class="cards" id="insCards"></div>
+
+      <div class="chart-box lookup">
+        <h3>Contact lookup</h3>
+        <form id="histForm" class="histform">
+          <input id="histNumber" placeholder="Phone number (e.g. 201001234567)" autocomplete="off" />
+          <button class="btn" type="submit">Look up</button>
+        </form>
+        <div id="histResult"></div>
+      </div>
+      <div class="cols">
+        <div class="chart-box">
+          <h3>Activity — last 14 days</h3>
+          <div id="chartTimeline"></div>
+          <div class="legend">
+            <span><i class="sw ok"></i> sent</span>
+            <span><i class="sw bad"></i> failed</span>
+            <span><i class="sw warn"></i> skipped</span>
+            <span><i class="sw bot"></i> bot replies</span>
+          </div>
+        </div>
+        <div class="chart-box">
+          <h3>Outcome breakdown</h3>
+          <div id="chartDonut"></div>
+        </div>
+      </div>
+      <div class="cols">
+        <div class="chart-box">
+          <h3>Top bot triggers</h3>
+          <div id="insTriggers"></div>
+        </div>
+        <div class="chart-box">
+          <h3>Recent activity</h3>
+          <div id="insRecent" class="feed"></div>
+        </div>
+      </div>
+      <p class="hint" id="insStamp"></p>
+    </section>
+
+    <!-- AUTO-REPLY -->
+    <section class="panel" id="tab-autoreply">
+      <h2>Auto-reply &amp; bot</h2>
+      <p class="muted">While connected, watitool can reply automatically to <b>incoming</b> messages — by keyword (below) or via a <b>flow</b> (next tab). Replies can be text, image, video, file or a voice note.</p>
+
+      <div class="bot-settings">
+        <label class="check big"><input type="checkbox" id="botEnabled" /> <b>Enable auto-reply &amp; flows</b></label>
+        <div class="grid2">
+          <label>Cooldown per contact (sec) <input type="number" id="botCooldown" /></label>
+          <label class="check inline"><input type="checkbox" id="botGroups" /> Reply in group chats too</label>
+        </div>
+      </div>
+
+      <h3>Keyword rules <span class="muted">(first match wins; an active flow takes priority)</span></h3>
+      <div id="rules"></div>
+      <button class="btn" id="btnAddRule">+ Add rule</button>
+
+      <div class="btnrow">
+        <button class="btn primary" id="btnSaveAuto">Save auto-replies</button>
+        <span class="saved" id="autoSaved"></span>
+      </div>
+    </section>
+
+    <!-- FLOWS -->
+    <section class="panel" id="tab-flows">
+      <h2>Flows <span class="muted">— interactive menu bot</span></h2>
+      <p class="muted">A keyword starts a flow; the bot sends a menu, waits for the reply, branches, can send media and collect answers. Edit the JSON, then test it live on the right — no WhatsApp needed.</p>
+      <div class="cols">
+        <div>
+          <h3>Flow definition</h3>
+          <textarea id="flowsJson" rows="22" spellcheck="false"></textarea>
+          <div class="btnrow">
+            <button class="btn primary" id="btnSaveFlows">Save flows</button>
+            <button class="btn" id="btnValidateFlows">Validate</button>
+            <span id="flowsMsg"></span>
+          </div>
+          <details class="help">
+            <summary>Step reference</summary>
+            <ul>
+              <li><code>trigger.keywords</code> — words that start the flow</li>
+              <li><code>send[]</code> — messages on entering a step: <code>{type:text|image|video|document|voice, text/path, caption}</code></li>
+              <li><code>options[]</code> — wait for a reply, branch: <code>{match:["1","yes"], next:"stepId"}</code> (numbers also match by position)</li>
+              <li><code>collect</code> — save the reply into a variable, then <code>next</code></li>
+              <li><code>next</code> — auto-advance to another step · <code>end:true</code> — finish</li>
+              <li><code>fallback</code> — reply shown when no option matches</li>
+            </ul>
+          </details>
+        </div>
+        <div>
+          <h3>Test it 💬</h3>
+          <div class="sim" id="simChat"></div>
+          <form id="simForm" class="sim-form">
+            <input id="simInput" placeholder="Type a message… (try: hi)" autocomplete="off" />
+            <button class="btn primary" type="submit">Send</button>
+          </form>
+          <button class="btn ghost" id="simReset">↺ Reset conversation</button>
+          <p class="hint">The simulator runs the real bot engine against your saved auto-replies + flows.</p>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <div class="toast" id="toast"></div>
+  <script src="app.js"></script>
+</body>
+</html>

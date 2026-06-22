@@ -1,0 +1,51 @@
+{
+  "rules": [
+    {
+      "keywords": [
+        "price",
+        "pricing",
+        "cost",
+        "how much"
+      ],
+      "match": "contains",
+      "reply": [
+        {
+          "type": "text",
+          "text": "Hi {{name}}! 👋 Our pricing starts at $19/mo. Reply *menu* to see all options."
+        }
+      ]
+    },
+    {
+      "keywords": [
+        "hours",
+        "open",
+        "timing"
+      ],
+      "match": "contains",
+      "reply": [
+        {
+          "type": "text",
+          "text": "We're open Sun–Thu, 9am–6pm 🕘 (it's currently {{time}})."
+        }
+      ]
+    },
+    {
+      "keywords": [
+        "brochure",
+        "catalog",
+        "catalogue"
+      ],
+      "match": "contains",
+      "reply": [
+        {
+          "type": "text",
+          "text": "Sure {{name}}, here's our catalog 📦"
+        },
+        {
+          "type": "document",
+          "path": "media/sample.pdf"
+        }
+      ]
+    }
+  ]
+}

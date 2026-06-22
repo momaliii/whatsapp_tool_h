@@ -1,0 +1,289 @@
+import { EventEmitter } from "node:events";
+import fs from "node:fs";
+import pkg from "whatsapp-web.js";
+import { runCampaign } from "./campaign.js";
+import { AUTH_DIR, dataPath } from "./paths.js";
+import { loadJson, sleep, randInt } from "./utils.js";
+import { planReply, fileStore } from "./bot.js";
+import { appendBotEvent } from "./analytics.js";
+
+const { Client, LocalAuth, MessageMedia } = pkg;
+
+/**
+ * Singleton engine that backs the web dashboard.
+ * Owns the WhatsApp client lifecycle and the running campaign, and emits
+ * a single "update" event whenever state changes (consumed via SSE).
+ */
+class Engine extends EventEmitter {
+  constructor() {
+    super();
+    this.client = null;
+    this.state = "disconnected"; // disconnected | connecting | qr | ready | running
+    this.qr = null;
+    this.me = null; // {name, number}
+    this.control = { stopped: false };
+    this.progress = { index: 0, total: 0, name: "", phase: "idle", wait: 0 };
+    this.stats = { sent: 0, failed: 0, skipped: 0, total: 0 };
+    this.logs = [];
+    this.lastRunResults = [];
+    this.botStore = fileStore();
+    this.botLastHandled = new Map(); // jid -> timestamp (cooldown)
+    this.scheduledAt = null;
+    try {
+      const s = JSON.parse(fs.readFileSync(dataPath("schedule.json"), "utf8"));
+      if (s.at) this.scheduledAt = s.at;
+    } catch {}
+    this._scheduleTick = setInterval(() => this.checkSchedule(), 30000);
+  }
+
+  snapshot() {
+    return {
+      state: this.state,
+      qr: this.qr,
+      me: this.me,
+      progress: this.progress,
+      stats: this.stats,
+      logs: this.logs.slice(-200),
+      scheduledAt: this.scheduledAt,
+    };
+  }
+
+  // ---------- scheduled start ----------
+  schedule(atMs) {
+    this.scheduledAt = atMs;
+    this.persistSchedule();
+    this.log("info", "Campaign scheduled for " + new Date(atMs).toLocaleString());
+    this.emitUpdate();
+  }
+  cancelSchedule() {
+    this.scheduledAt = null;
+    this.persistSchedule();
+    this.log("info", "Schedule cancelled.");
+    this.emitUpdate();
+  }
+  persistSchedule() {
+    try { fs.writeFileSync(dataPath("schedule.json"), JSON.stringify({ at: this.scheduledAt })); } catch {}
+  }
+  checkSchedule() {
+    if (!this.scheduledAt || Date.now() < this.scheduledAt) return;
+    if (this.state !== "ready") return; // wait until connected & idle
+    this.scheduledAt = null;
+    this.persistSchedule();
+    this.log("info", "⏰ Scheduled time reached — starting campaign.");
+    this.run({ dryRun: false }).catch((e) => this.log("error", e.message));
+  }
+
+  emitUpdate() {
+    this.emit("update", this.snapshot());
+  }
+
+  log(level, message) {
+    this.logs.push({ level, message, time: new Date().toISOString() });
+    if (this.logs.length > 500) this.logs = this.logs.slice(-500);
+    this.emitUpdate();
+  }
+
+  /** Boot the WhatsApp client (idempotent). Emits qr until scanned, then ready. */
+  async connect() {
+    if (this.client) return;
+    this.state = "connecting";
+    this.qr = null;
+    this.log("info", "Connecting to WhatsApp Web…");
+
+    const client = new Client({
+      authStrategy: new LocalAuth({ dataPath: AUTH_DIR }),
+      puppeteer: {
+        headless: true,
+        // On a server we use the system Chromium (set via env in Docker);
+        // locally this is undefined and puppeteer's bundled Chromium is used.
+        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+        args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"],
+      },
+    });
+    this.client = client;
+
+    client.on("qr", (qr) => {
+      this.qr = qr;
+      this.state = "qr";
+      this.log("info", "QR ready — scan it with WhatsApp → Linked Devices.");
+    });
+
+    client.on("ready", () => {
+      this.qr = null;
+      this.state = "ready";
+      const info = client.info || {};
+      this.me = {
+        name: info.pushname || "",
+        number: info.wid?.user || "",
+      };
+      this.log("info", `Connected as ${this.me.name || this.me.number}.`);
+    });
+
+    // incoming messages → auto-reply / flow bot
+    client.on("message", (msg) => {
+      this.handleIncoming(msg).catch((e) => this.log("error", "bot: " + (e.message || e)));
+    });
+
+    client.on("auth_failure", (m) => this.log("error", "Auth failure: " + m));
+    client.on("disconnected", (r) => {
+      this.log("warn", "Disconnected: " + r);
+      this.state = "disconnected";
+      this.client = null;
+      this.me = null;
+      this.emitUpdate();
+    });
+
+    client.initialize().catch((e) => {
+      this.log("error", "Init error: " + (e.message || e));
+      this.state = "disconnected";
+      this.client = null;
+    });
+  }
+
+  /** Log out and forget the saved session. */
+  async logout() {
+    if (this.state === "running") throw new Error("Stop the campaign first.");
+    if (this.client) {
+      try { await this.client.logout(); } catch {}
+      try { await this.client.destroy(); } catch {}
+    }
+    this.client = null;
+    this.me = null;
+    this.qr = null;
+    this.state = "disconnected";
+    this.log("info", "Logged out.");
+  }
+
+  /** Start a campaign. dryRun works without a live connection. */
+  async run({ dryRun = false } = {}) {
+    if (this.state === "running") throw new Error("A campaign is already running.");
+    if (!dryRun && this.state !== "ready")
+      throw new Error("Connect to WhatsApp first (scan the QR).");
+
+    this.control = { stopped: false };
+    this.lastRunResults = [];
+    this.state = "running";
+    this.stats = { sent: 0, failed: 0, skipped: 0, total: 0 };
+    this.progress = { index: 0, total: 0, name: "", phase: "starting", wait: 0 };
+    this.emitUpdate();
+
+    try {
+      await runCampaign(this.client, {
+        dryRun,
+        control: this.control,
+        on: {
+          start: (stats) => {
+            this.stats = stats;
+            this.emitUpdate();
+          },
+          progress: (p) => {
+            this.progress = { index: p.index, total: p.total, name: p.name, phase: p.phase, wait: p.wait };
+            this.stats = p.stats;
+            this.emitUpdate();
+          },
+          item: (it) => {
+            this.lastRunResults.push(it);
+          },
+          log: (level, message) => this.log(level, message),
+          done: (stats) => {
+            this.stats = stats;
+            this.log(
+              "info",
+              `Finished — ✓${stats.sent} sent, ✗${stats.failed} failed, ⊘${stats.skipped} skipped.`
+            );
+          },
+        },
+      });
+    } finally {
+      this.state = dryRun ? "disconnected" : "ready";
+      if (dryRun && this.client) this.state = "ready";
+      this.progress = { ...this.progress, phase: "idle", wait: 0 };
+      this.emitUpdate();
+    }
+  }
+
+  stop() {
+    if (this.state !== "running") return;
+    this.control.stopped = true;
+    this.log("warn", "Stopping…");
+  }
+
+  // ---------- auto-reply / flow bot ----------
+  async handleIncoming(msg) {
+    let config;
+    try { config = loadJson("config.json"); } catch { return; }
+    const bot = config.bot || {};
+    if (!bot.enabled) return;
+
+    const from = msg.from || "";
+    if (msg.fromMe || msg.isStatus) return;
+    if (from.endsWith("@g.us") && !bot.replyInGroups) return; // groups
+    if (!from.endsWith("@c.us") && !from.endsWith("@g.us")) return; // not a chat
+
+    // don't reply while a campaign is actively sending to avoid collisions
+    if (this.state === "running") return;
+
+    // cooldown (skipped if the contact is mid-flow, so quick replies aren't lost)
+    const inFlow = !!this.botStore.get(from);
+    const now = Date.now();
+    const gap = (bot.cooldownSeconds ?? 3) * 1000;
+    if (!inFlow && now - (this.botLastHandled.get(from) || 0) < gap) return;
+
+    let autoreply = {}, flows = [];
+    try { autoreply = loadJson("autoreply.json"); } catch {}
+    try { flows = loadJson("flows.json"); } catch {}
+
+    const name = msg._data?.notifyName || "";
+    const plan = planReply(
+      { from, body: msg.body || "", name },
+      { config, autoreply, flows, store: this.botStore }
+    );
+    if (!plan.handled || !plan.actions.length) return;
+
+    this.botLastHandled.set(from, now);
+    const chat = await msg.getChat().catch(() => null);
+    for (const action of plan.actions) {
+      try { await this.sendItem(from, action, chat); }
+      catch (e) { this.log("error", `bot send failed: ${e.message || e}`); }
+      await sleep(randInt(700, 1800));
+    }
+    appendBotEvent({
+      from: from.replace("@c.us", ""),
+      name,
+      kind: plan.kind || "autoreply",
+      flow: plan.flow,
+      label: plan.label,
+      actions: plan.actions.length,
+    });
+    this.log("info", `🤖 replied to ${name || from.replace("@c.us", "")} (${plan.actions.length} msg)`);
+    this.emitUpdate();
+  }
+
+  /** Send one planned action item to a chat, human-like. */
+  async sendItem(jid, item, chat) {
+    const typeText = item.text;
+    if (typeText && chat) {
+      try {
+        await chat.sendStateTyping();
+        await sleep(Math.min(6000, Math.max(800, typeText.length * 60)));
+        await chat.clearState();
+      } catch {}
+    }
+    if (item.path) {
+      const file = dataPath(item.path);
+      if (!fs.existsSync(file)) throw new Error(`media not found: ${item.path}`);
+      const media = MessageMedia.fromFilePath(file);
+      const asVoice = item.type === "voice" || item.voice === true;
+      await this.client.sendMessage(jid, media, {
+        caption: item.caption || (item.type !== "voice" ? item.text : undefined) || undefined,
+        sendAudioAsVoice: asVoice,
+      });
+      // if text accompanies a voice note, send it separately
+      if (asVoice && item.text) await this.client.sendMessage(jid, item.text);
+    } else if (typeText) {
+      await this.client.sendMessage(jid, typeText);
+    }
+  }
+}
+
+export const engine = new Engine();

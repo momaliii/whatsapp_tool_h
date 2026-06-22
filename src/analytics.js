@@ -1,0 +1,221 @@
+import fs from "node:fs";
+import { parse } from "csv-parse/sync";
+import { dataPath } from "./paths.js";
+import { toJid } from "./utils.js";
+
+const BOT_LOG = "bot-log.jsonl";
+
+/** Append one bot-activity event (best-effort). */
+export function appendBotEvent(rec) {
+  try {
+    const line = JSON.stringify({ time: new Date().toISOString(), ...rec }) + "\n";
+    fs.appendFileSync(dataPath(BOT_LOG), line);
+  } catch {}
+}
+
+function readResults() {
+  try {
+    const raw = fs.readFileSync(dataPath("results.csv"), "utf8");
+    return parse(raw, { columns: true, skip_empty_lines: true, relax_column_count: true });
+  } catch { return []; }
+}
+
+function readBotEvents() {
+  try {
+    return fs.readFileSync(dataPath(BOT_LOG), "utf8")
+      .split("\n").filter(Boolean)
+      .map((l) => { try { return JSON.parse(l); } catch { return null; } })
+      .filter(Boolean);
+  } catch { return []; }
+}
+
+const dayKey = (iso) => String(iso || "").slice(0, 10);
+
+/** Human-friendly duration from seconds. */
+export function humanDuration(s) {
+  s = Math.max(0, Math.round(s));
+  const h = Math.floor(s / 3600);
+  const m = Math.round((s % 3600) / 60);
+  if (h >= 1) return `${h}h ${m}m`;
+  if (m >= 1) return `${m}m ${s % 60}s`;
+  return `${s}s`;
+}
+
+/**
+ * Estimate how long a campaign of `count` messages will take, mirroring the
+ * real send loop (random delays, batch breaks, typing, registered check).
+ */
+export function estimateDuration(count, cfg = {}, avgLen = 60) {
+  count = Math.max(0, Math.floor(count));
+  if (count < 1) return { count, seconds: 0, human: "—", batches: 0 };
+
+  const d = cfg.delay || {};
+  const avgDelay = ((+d.minSeconds || 0) + (+d.maxSeconds || 0)) / 2;
+  const bs = +cfg.batch?.size || 0;
+  const restS = (+cfg.batch?.restMinutes || 0) * 60;
+
+  const gaps = count - 1;
+  const batches = bs > 0 && restS > 0 ? Math.floor(gaps / bs) : 0;
+  const normalGaps = gaps - batches;
+  const delayTotal = normalGaps * avgDelay + batches * restS;
+
+  let typing = 0;
+  if (cfg.typing?.enabled) {
+    const cps = +cfg.typing.charsPerSecond || 9;
+    typing = Math.min(+cfg.typing.maxSeconds || 12, Math.max(+cfg.typing.minSeconds || 2, avgLen / cps));
+  }
+  const check = cfg.safety?.checkRegistered ? 1.5 : 0;
+  const sendT = 1.5;
+  const perMsg = typing + check + sendT;
+  const seconds = Math.round(delayTotal + perMsg * count);
+
+  return {
+    count, seconds, human: humanDuration(seconds), batches,
+    avgDelaySeconds: Math.round(avgDelay),
+    restMinutes: +cfg.batch?.restMinutes || 0,
+    perMessageSeconds: Math.round(perMsg),
+    finishAt: new Date(Date.now() + seconds * 1000).toISOString(),
+  };
+}
+
+/**
+ * Suggest delay settings to finish `count` messages in ~`targetSeconds`,
+ * keeping batch/typing/check fixed. Flags how risky the result is.
+ */
+export function suggestSettings(count, targetSeconds, cfg = {}, avgLen = 60) {
+  count = Math.max(1, Math.floor(count));
+  const bs = +cfg.batch?.size || 0;
+  const gaps = Math.max(1, count - 1);
+  const batches = bs > 0 ? Math.floor(gaps / bs) : 0;
+  const normalGaps = Math.max(1, gaps - batches);
+
+  let typing = 0;
+  if (cfg.typing?.enabled) {
+    const cps = +cfg.typing.charsPerSecond || 9;
+    typing = Math.min(+cfg.typing.maxSeconds || 12, Math.max(+cfg.typing.minSeconds || 2, avgLen / cps));
+  }
+  const perMsgTotal = (typing + (cfg.safety?.checkRegistered ? 1.5 : 0) + 1.5) * count;
+
+  const SAFE_MIN_AVG = 20; // recommended floor for the average gap (seconds)
+  const HARD_MIN_AVG = 6;  // below this is very high ban risk
+
+  let restMinutes = +cfg.batch?.restMinutes || 0;
+  let restS = restMinutes * 60;
+  let tunedBatch = false;
+  let feasible = true, risk = "safe";
+
+  // step 1: keep batch breaks, solve for the average gap
+  let avgDelay = (targetSeconds - batches * restS - perMsgTotal) / normalGaps;
+
+  if (avgDelay >= SAFE_MIN_AVG) {
+    risk = "safe";
+  } else if (avgDelay >= HARD_MIN_AVG) {
+    risk = "risky";
+  } else {
+    // step 2: floor the gap, then shrink the batch breaks to claw back time
+    avgDelay = HARD_MIN_AVG;
+    risk = "very-risky";
+    if (batches > 0) {
+      const budget = targetSeconds - normalGaps * avgDelay - perMsgTotal;
+      if (budget < batches * restS) {
+        tunedBatch = true;
+        restMinutes = Math.max(0, Math.round(budget / batches / 60));
+        restS = restMinutes * 60;
+      }
+    }
+    const minTime = normalGaps * avgDelay + batches * restS + perMsgTotal;
+    feasible = minTime <= targetSeconds * 1.05;
+  }
+
+  const spread = Math.max(2, Math.round(avgDelay * 0.4));
+  const minSeconds = Math.max(1, Math.round(avgDelay - spread));
+  const maxSeconds = Math.round(avgDelay + spread);
+
+  const suggestedCfg = { ...cfg, delay: { minSeconds, maxSeconds }, batch: { ...cfg.batch, size: bs, restMinutes } };
+  const achieved = estimateDuration(count, suggestedCfg, avgLen);
+
+  return {
+    feasible, risk,
+    suggested: { minSeconds, maxSeconds, batchSize: bs, restMinutes, tunedBatch },
+    achievedSeconds: achieved.seconds, achievedHuman: achieved.human,
+    note:
+      !feasible ? `Even at the riskiest safe-ish settings the fastest is ~${achieved.human}. To go faster you'd send recklessly — likely a ban.` :
+      risk === "very-risky" ? "This hits your target but the gaps are very short — high ban risk. Warm up the number and watch closely." :
+      risk === "risky" ? "Achievable, but gaps are short — keep an eye out for blocks." :
+      "Looks safe for a healthy number.",
+  };
+}
+
+/** Full message history for one phone number (campaign sends + bot replies). */
+export function contactHistory(query, countryCode) {
+  const { number } = toJid(query || "", countryCode);
+  const results = readResults().filter((r) => r.number === number);
+  const events = readBotEvents().filter((e) => String(e.from || "") === number);
+  const items = [
+    ...results.map((r) => ({ time: r.timestamp, dir: "out", status: r.status, detail: r.detail || "" })),
+    ...events.map((e) => ({ time: e.time, dir: "bot", status: e.kind || "reply", detail: e.label || "" })),
+  ].filter((x) => x.time).sort((a, b) => (a.time < b.time ? 1 : -1));
+  const name = results[0]?.name || events[0]?.name || "";
+  return { number, name, count: items.length, items };
+}
+
+/** Aggregate everything the Insights tab needs, filtered to the last `days`. */
+export function computeInsights({ days = 30 } = {}) {
+  let contacts = 0;
+  try {
+    contacts = parse(fs.readFileSync(dataPath("contacts.csv"), "utf8"), {
+      columns: true, skip_empty_lines: true, trim: true,
+    }).length;
+  } catch {}
+
+  const cutoff = Date.now() - days * 86400000;
+  const inRange = (iso) => { const t = Date.parse(iso); return !isNaN(t) && t >= cutoff; };
+
+  const results = readResults().filter((r) => inRange(r.timestamp));
+  const events = readBotEvents().filter((e) => inRange(e.time));
+
+  // status breakdown
+  const status = {};
+  for (const r of results) status[r.status] = (status[r.status] || 0) + 1;
+  const sent = status.sent || 0, failed = status.failed || 0, skipped = status.skipped || 0;
+  const attempted = sent + failed;
+  const deliveryRate = attempted ? Math.round((sent / attempted) * 100) : 0;
+
+  // timeline
+  const today = new Date();
+  const buckets = new Map();
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    const k = d.toISOString().slice(0, 10);
+    buckets.set(k, { date: k, sent: 0, failed: 0, skipped: 0, bot: 0 });
+  }
+  for (const r of results) { const b = buckets.get(dayKey(r.timestamp)); if (b && b[r.status] != null) b[r.status]++; }
+  for (const e of events) { const b = buckets.get(dayKey(e.time)); if (b) b.bot++; }
+  const timeline = [...buckets.values()];
+
+  // bot
+  const byKind = {}, byFlow = {};
+  for (const e of events) {
+    byKind[e.kind || "other"] = (byKind[e.kind || "other"] || 0) + 1;
+    const label = e.label || e.flow || e.kind || "other";
+    byFlow[label] = (byFlow[label] || 0) + 1;
+  }
+  const topTriggers = Object.entries(byFlow).sort((a, b) => b[1] - a[1]).slice(0, 6)
+    .map(([label, count]) => ({ label, count }));
+
+  const recent = [
+    ...results.map((r) => ({ time: r.timestamp, kind: "send", status: r.status, who: r.name || r.number, detail: r.detail || "" })),
+    ...events.map((e) => ({ time: e.time, kind: "bot", status: e.kind, who: e.name || e.from || "", detail: e.label || "" })),
+  ].filter((x) => x.time).sort((a, b) => (a.time < b.time ? 1 : -1)).slice(0, 25);
+
+  return {
+    days,
+    totals: { contacts, sent, failed, skipped, deliveryRate, botReplies: events.length, campaignMessages: results.length },
+    statusBreakdown: status,
+    timeline,
+    bot: { total: events.length, byKind, topTriggers },
+    recent,
+    generatedAt: new Date().toISOString(),
+  };
+}

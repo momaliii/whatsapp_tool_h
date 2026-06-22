@@ -1,0 +1,41 @@
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    environment:
+      - WATITOOL_PASSWORD=${WATITOOL_PASSWORD}
+      - PORT=3000
+    volumes:
+      # WhatsApp login session — the most important thing to persist.
+      - wwebjs_auth:/app/.wwebjs_auth
+      - wwebjs_cache:/app/.wwebjs_cache
+      # Editable data — survives restarts and is editable from the dashboard.
+      - ./config.json:/app/config.json
+      - ./campaign.json:/app/campaign.json
+      - ./contacts.csv:/app/contacts.csv
+      - ./results.csv:/app/results.csv
+      - ./media:/app/media
+    expose:
+      - "3000"
+
+  # Reverse proxy that gives you automatic HTTPS (Let's Encrypt) for your domain.
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - DOMAIN=${DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - app
+
+volumes:
+  wwebjs_auth:
+  wwebjs_cache:
+  caddy_data:
+  caddy_config:

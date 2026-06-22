@@ -1,0 +1,61 @@
+{
+  "_comment": "All timings are in SECONDS. Keep these human. Going too fast is the #1 reason WhatsApp bans accounts.",
+  "auth": {
+    "password": "changeme",
+    "_help": "Password to open the web dashboard. CHANGE THIS before putting it online. Leave empty (\"\") to disable. You can also set it via the WATITOOL_PASSWORD environment variable, which overrides this and keeps it out of the file."
+  },
+  "vars": {
+    "locale": "ar-EG",
+    "timezone": "Africa/Cairo",
+    "_help": "Optional. Controls how {{date}}, {{time}}, {{day}} are formatted. e.g. locale \"ar-EG\" + timezone \"Africa/Cairo\" for Arabic dates in Cairo time. Leave empty to use the server's defaults."
+  },
+  "bot": {
+    "enabled": true,
+    "replyInGroups": false,
+    "cooldownSeconds": 5,
+    "exitKeywords": [
+      "cancel",
+      "stop",
+      "exit"
+    ],
+    "exitMessage": "Okay, cancelled. 👋 Reply *menu* anytime.",
+    "_help": "Master switch for auto-replies AND flows. Only works while connected. cooldownSeconds throttles repeated replies to the same person (ignored mid-flow). exitKeywords end an active flow."
+  },
+  "schedule": {
+    "window": {
+      "enabled": true,
+      "start": "09:00",
+      "end": "21:00"
+    },
+    "_help": "Sending window in the timezone set under vars.timezone (Settings → Date & time). When enabled, a running campaign only sends between start and end, and pauses outside those hours. Supports overnight windows (e.g. start 22:00, end 06:00)."
+  },
+  "countryCode": "20",
+  "_countryCode_help": "Default country code added to numbers that don't already include one. 20 = Egypt, 966 = KSA, 971 = UAE, 1 = US/CA.",
+  "delay": {
+    "minSeconds": 25,
+    "maxSeconds": 70,
+    "_help": "A RANDOM wait is picked between min and max after every message. Real people are not robots — never make this a fixed value."
+  },
+  "typing": {
+    "enabled": true,
+    "charsPerSecond": 9,
+    "minSeconds": 2,
+    "maxSeconds": 12,
+    "_help": "Shows the 'typing…' indicator for a duration based on message length, so the contact sees a natural pause before the text lands."
+  },
+  "batch": {
+    "size": 40,
+    "restMinutes": 12,
+    "_help": "After every <size> messages, take a longer break of <restMinutes>. Mimics a human taking a break and spreads load across the day."
+  },
+  "safety": {
+    "checkRegistered": true,
+    "_checkRegistered_help": "Skip numbers that are not on WhatsApp (avoids wasting sends and looking like a spam blast).",
+    "maxPerRun": 0,
+    "_maxPerRun_help": "Hard cap on messages per run (0 = no cap). Useful while warming up a new number.",
+    "skipAlreadySent": true,
+    "_skipAlreadySent_help": "Reads results.csv and never messages the same number twice. Makes the run fully resumable."
+  },
+  "onlinePresence": true,
+  "_onlinePresence_help": "Keep the account marked online while the campaign runs."
+}

@@ -1,0 +1,6 @@
+# Automatic HTTPS for your domain. Caddy gets/renews the certificate for you.
+# {$DOMAIN} comes from the DOMAIN value in your .env file.
+{$DOMAIN} {
+	reverse_proxy app:3000
+	encode gzip
+}
