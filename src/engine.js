@@ -210,35 +210,37 @@ class Engine extends EventEmitter {
 
   // ---------- auto-reply / flow bot ----------
   async handleIncoming(msg) {
-    let config;
-    try { config = loadJson("config.json"); } catch { return; }
-    const bot = config.bot || {};
-    if (!bot.enabled) return;
-
     const from = msg.from || "";
-    if (msg.fromMe || msg.isStatus) return;
-    if (from.endsWith("@g.us") && !bot.replyInGroups) return; // groups
-    if (!from.endsWith("@c.us") && !from.endsWith("@g.us")) return; // not a chat
+    if (msg.fromMe || msg.isStatus) return; // ignore own / status updates silently
+    if (!from.endsWith("@c.us") && !from.endsWith("@g.us")) return; // not a normal chat
 
-    // don't reply while a campaign is actively sending to avoid collisions
-    if (this.state === "running") return;
+    const name = msg._data?.notifyName || "";
+    const who = name || from.replace("@c.us", "");
+    const preview = (msg.body || "").slice(0, 50);
+    this.log("info", `📩 incoming from ${who}: "${preview}"`);
+
+    let config;
+    try { config = loadJson("config.json"); } catch { this.log("error", "bot: cannot read config.json"); return; }
+    const bot = config.bot || {};
+    if (!bot.enabled) { this.log("warn", "🤖 auto-reply is OFF — enable it on the Auto-reply tab and Save."); return; }
+    if (from.endsWith("@g.us") && !bot.replyInGroups) { this.log("info", "↳ group chat — ignored (groups disabled)."); return; }
+    if (this.state === "running") { this.log("info", "↳ ignored — a campaign is currently sending."); return; }
 
     // cooldown (skipped if the contact is mid-flow, so quick replies aren't lost)
     const inFlow = !!this.botStore.get(from);
     const now = Date.now();
     const gap = (bot.cooldownSeconds ?? 3) * 1000;
-    if (!inFlow && now - (this.botLastHandled.get(from) || 0) < gap) return;
+    if (!inFlow && now - (this.botLastHandled.get(from) || 0) < gap) { this.log("info", `↳ cooldown — waited <${bot.cooldownSeconds ?? 3}s, skipped.`); return; }
 
     let autoreply = {}, flows = [];
-    try { autoreply = loadJson("autoreply.json"); } catch {}
-    try { flows = loadJson("flows.json"); } catch {}
+    try { autoreply = loadJson("autoreply.json"); } catch { this.log("warn", "bot: autoreply.json missing"); }
+    try { flows = loadJson("flows.json"); } catch { this.log("warn", "bot: flows.json missing"); }
 
-    const name = msg._data?.notifyName || "";
     const plan = planReply(
       { from, body: msg.body || "", name },
       { config, autoreply, flows, store: this.botStore }
     );
-    if (!plan.handled || !plan.actions.length) return;
+    if (!plan.handled || !plan.actions.length) { this.log("info", `↳ no rule or flow matched "${preview}".`); return; }
 
     this.botLastHandled.set(from, now);
     const chat = await msg.getChat().catch(() => null);
