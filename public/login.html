@@ -37,7 +37,7 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ password }),
       });
-      if (r.ok) location.href = "/";
+      if (r.ok) location.href = "/app";
       else document.getElementById("err").textContent = "Wrong password — try again.";
     };
   </script>

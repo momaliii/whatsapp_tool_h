@@ -33,7 +33,9 @@ app.set("trust proxy", true);
 app.use(express.json({ limit: "2mb" }));
 app.use(express.text({ type: "text/csv", limit: "5mb" }));
 
-// ---------- public auth routes (before the gate) ----------
+// ---------- public pages (no login required) ----------
+app.get("/", (_req, res) => res.sendFile(path.join(PUBLIC, "home.html")));
+app.get("/pricing", (_req, res) => res.redirect("/#pricing"));
 app.get("/login", (_req, res) => res.sendFile(path.join(PUBLIC, "login.html")));
 app.get("/style.css", (_req, res) => res.sendFile(path.join(PUBLIC, "style.css")));
 
@@ -57,6 +59,8 @@ app.post("/api/signout", (req, res) => {
 
 // ---------- everything below requires a valid session ----------
 app.use(requireAuth);
+// the dashboard lives at /app (gated); "/" is the public landing page
+app.get("/app", (_req, res) => res.sendFile(path.join(PUBLIC, "index.html")));
 app.use(express.static(PUBLIC));
 
 // ---- media uploads ----
