@@ -106,8 +106,15 @@ class Engine extends EventEmitter {
     client.on("qr", (qr) => {
       this.qr = qr;
       this.state = "qr";
-      this.log("info", "QR ready — scan it with WhatsApp → Linked Devices.");
+      this._qrCount = (this._qrCount || 0) + 1;
+      this.log("info", `QR ready (refresh #${this._qrCount}) — scan the LATEST code shown, it expires every ~20s.`);
     });
+
+    // connection lifecycle — surfaces exactly where a link attempt fails
+    client.on("loading_screen", (percent, message) =>
+      this.log("info", `Loading WhatsApp… ${percent}% ${message || ""}`));
+    client.on("authenticated", () => this.log("info", "✓ QR accepted — finalizing link…"));
+    client.on("change_state", (s) => this.log("info", "State: " + s));
 
     client.on("ready", () => {
       this.qr = null;
@@ -129,7 +136,8 @@ class Engine extends EventEmitter {
     client.on("message", onMsg);
     client.on("message_create", onMsg);
 
-    client.on("auth_failure", (m) => this.log("error", "Auth failure: " + m));
+    client.on("auth_failure", (m) =>
+      this.log("error", "Auth failure: " + m + " — click Log out to clear the session, then Connect again."));
     client.on("disconnected", (r) => {
       this.log("warn", "Disconnected: " + r);
       this.state = "disconnected";
@@ -155,8 +163,11 @@ class Engine extends EventEmitter {
     this.client = null;
     this.me = null;
     this.qr = null;
+    this._qrCount = 0;
     this.state = "disconnected";
-    this.log("info", "Logged out.");
+    // wipe the saved session folder so the next connect is a clean re-link
+    try { fs.rmSync(AUTH_DIR, { recursive: true, force: true }); } catch {}
+    this.log("info", "Logged out and cleared the saved session — you can scan a fresh QR now.");
   }
 
   /** Start a campaign. dryRun works without a live connection. */
