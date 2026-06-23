@@ -424,6 +424,7 @@ function renderRecent(recent) {
 }
 $("btnRefreshIns").onclick = loadInsights;
 document.querySelector('.tab[data-tab="insights"]').addEventListener("click", loadInsights);
+document.querySelector('.tab[data-tab="flows"]').addEventListener("click", () => window.FlowBuilder && window.FlowBuilder.refresh());
 
 // date-range buttons
 $("rangeBtns").querySelectorAll("button").forEach((b) => {
@@ -554,9 +555,7 @@ async function loadBot() {
     };
   });
   renderRules();
-  // flows
-  const fl = await api("/api/flows");
-  $("flowsJson").value = JSON.stringify(fl, null, 2);
+  // flows are handled by the visual builder (flowbuilder.js)
 }
 function renderRules() {
   const el = $("rules");
@@ -619,24 +618,6 @@ $("btnSaveAuto").onclick = async () => {
     await api("/api/config", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(cfg) });
     await api("/api/autoreply", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ rules }) });
     flashSaved("autoSaved");
-  } catch (e) { toast(e.message, true); }
-};
-
-// ---------- flows ----------
-$("btnValidateFlows").onclick = () => {
-  try {
-    const o = JSON.parse($("flowsJson").value);
-    const n = (o.flows || []).length;
-    $("flowsMsg").innerHTML = `<span style="color:var(--green)">✓ valid — ${n} flow(s)</span>`;
-  } catch (e) { $("flowsMsg").innerHTML = `<span style="color:var(--red)">✗ ${e.message}</span>`; }
-};
-$("btnSaveFlows").onclick = async () => {
-  let o;
-  try { o = JSON.parse($("flowsJson").value); }
-  catch (e) { return ($("flowsMsg").innerHTML = `<span style="color:var(--red)">✗ ${e.message}</span>`); }
-  try {
-    await api("/api/flows", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(o) });
-    $("flowsMsg").innerHTML = `<span style="color:var(--green)">✓ saved</span>`;
   } catch (e) { toast(e.message, true); }
 };
 

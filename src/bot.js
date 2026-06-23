@@ -74,6 +74,50 @@ export function memStore(initial = {}) {
   };
 }
 
+// ---------- visual graph → step format ----------
+/**
+ * Compile a node/edge flow (from the visual builder) into the step format the
+ * engine runs. Flows already in step format pass through unchanged.
+ * Node types: trigger, message, menu, question, end.
+ */
+export function compileFlow(flow) {
+  if (!flow || (flow.steps && !flow.nodes)) return flow; // already step-format
+  const nodes = flow.nodes || [];
+  const edges = flow.edges || [];
+  const target = (nodeId, port = "out") => {
+    const e = edges.find((e) => e.from === nodeId && (e.fromPort || "out") === port);
+    return e ? e.to : undefined;
+  };
+  const kw = (s) => String(s || "").split(",").map((x) => x.trim()).filter(Boolean);
+
+  const steps = {};
+  for (const n of nodes) {
+    const d = n.data || {};
+    if (n.type === "message") {
+      const next = target(n.id);
+      steps[n.id] = { send: d.items?.length ? d.items : [{ type: "text", text: d.text || "" }], ...(next ? { next } : { end: true }) };
+    } else if (n.type === "menu") {
+      const options = (d.options || [])
+        .map((o, i) => ({ match: kw(o.match || o.label), next: target(n.id, "opt" + i) }))
+        .filter((o) => o.next && o.match.length);
+      steps[n.id] = { send: [{ type: "text", text: d.text || "" }], options, fallback: d.fallback ? { type: "text", text: d.fallback } : undefined };
+    } else if (n.type === "question") {
+      steps[n.id] = { send: [{ type: "text", text: d.text || "" }], collect: d.var || "answer", next: target(n.id) };
+    } else if (n.type === "end") {
+      steps[n.id] = { send: d.text ? [{ type: "text", text: d.text }] : [], end: true };
+    }
+  }
+  const trig = nodes.find((n) => n.type === "trigger");
+  return {
+    id: flow.id,
+    name: flow.name,
+    enabled: flow.enabled,
+    trigger: flow.trigger || { keywords: [], match: "contains" },
+    start: trig ? target(trig.id) : flow.start,
+    steps,
+  };
+}
+
 // ---------- flow stepping ----------
 function enterStep(from, flow, stepId, store, vars, opts, actions = []) {
   const step = flow.steps?.[stepId];
@@ -139,7 +183,8 @@ export function planReply(input, data) {
   const { config = {}, autoreply = {}, flows = [], store } = data;
   const bot = config.bot || {};
   const opts = { locale: config.vars?.locale, timezone: config.vars?.timezone };
-  const flowList = Array.isArray(flows) ? flows : flows.flows || [];
+  const rawFlows = Array.isArray(flows) ? flows : flows.flows || [];
+  const flowList = rawFlows.map(compileFlow);
   const rules = autoreply.rules || [];
 
   const session = store.get(from);

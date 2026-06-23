@@ -296,38 +296,44 @@
 
     <!-- FLOWS -->
     <section class="panel" id="tab-flows">
-      <h2>Flows <span class="muted">— interactive menu bot</span></h2>
-      <p class="muted">A keyword starts a flow; the bot sends a menu, waits for the reply, branches, can send media and collect answers. Edit the JSON, then test it live on the right — no WhatsApp needed.</p>
+      <h2>Flow builder <span class="muted">— visual chatbot</span></h2>
+      <p class="muted">Add nodes, then <b>drag a node's right dot onto another node</b> to connect them. Drag node headers to move them. Set the trigger keywords, <b>Save</b>, then test below.</p>
+
+      <div class="fb-bar">
+        <select id="fbSelect"></select>
+        <button class="btn" id="fbNew">+ New flow</button>
+        <input id="fbName" placeholder="Flow name" style="width:150px" />
+        <input id="fbKeywords" placeholder="trigger keywords: hi, menu" style="width:220px" />
+        <label class="check inline" style="gap:4px"><input type="checkbox" id="fbEnabled" /> on</label>
+        <button class="btn primary" id="fbSave">Save</button>
+        <span id="fbMsg" class="muted"></span>
+      </div>
+
+      <div class="fb-palette">
+        <span class="muted">Add node:</span>
+        <button class="btn ghost" data-add="message">💬 Message</button>
+        <button class="btn ghost" data-add="menu">📋 Menu</button>
+        <button class="btn ghost" data-add="question">❓ Question</button>
+        <button class="btn ghost" data-add="end">🏁 End</button>
+      </div>
+
+      <div class="fb-main">
+        <div class="fb-canvas" id="fbCanvas"><svg id="fbEdges"></svg></div>
+        <div class="fb-editor" id="fbEditor"></div>
+      </div>
+
+      <h3 style="margin-top:26px">Test it 💬 <span class="muted">(Save first to test your latest changes)</span></h3>
       <div class="cols">
         <div>
-          <h3>Flow definition</h3>
-          <textarea id="flowsJson" rows="22" spellcheck="false"></textarea>
-          <div class="btnrow">
-            <button class="btn primary" id="btnSaveFlows">Save flows</button>
-            <button class="btn" id="btnValidateFlows">Validate</button>
-            <span id="flowsMsg"></span>
-          </div>
-          <details class="help">
-            <summary>Step reference</summary>
-            <ul>
-              <li><code>trigger.keywords</code> — words that start the flow</li>
-              <li><code>send[]</code> — messages on entering a step: <code>{type:text|image|video|document|voice, text/path, caption}</code></li>
-              <li><code>options[]</code> — wait for a reply, branch: <code>{match:["1","yes"], next:"stepId"}</code> (numbers also match by position)</li>
-              <li><code>collect</code> — save the reply into a variable, then <code>next</code></li>
-              <li><code>next</code> — auto-advance to another step · <code>end:true</code> — finish</li>
-              <li><code>fallback</code> — reply shown when no option matches</li>
-            </ul>
-          </details>
-        </div>
-        <div>
-          <h3>Test it 💬</h3>
           <div class="sim" id="simChat"></div>
           <form id="simForm" class="sim-form">
             <input id="simInput" placeholder="Type a message… (try: hi)" autocomplete="off" />
             <button class="btn primary" type="submit">Send</button>
           </form>
           <button class="btn ghost" id="simReset">↺ Reset conversation</button>
-          <p class="hint">The simulator runs the real bot engine against your saved auto-replies + flows.</p>
+        </div>
+        <div>
+          <p class="hint">The simulator runs the real bot engine against your <b>saved</b> auto-replies + flows — no WhatsApp needed. Try the trigger word, then reply to the menu.</p>
         </div>
       </div>
     </section>
@@ -336,5 +342,6 @@
 
   <div class="toast" id="toast"></div>
   <script src="app.js"></script>
+  <script src="flowbuilder.js"></script>
 </body>
 </html>

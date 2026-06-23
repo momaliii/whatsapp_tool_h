@@ -93,6 +93,12 @@ class Engine extends EventEmitter {
 
     const client = new Client({
       authStrategy: new LocalAuth({ dataPath: AUTH_DIR }),
+      // Escape hatch: if message events ever stop firing after a WhatsApp Web
+      // update, set WWEBJS_WEB_VERSION to a known-good HTML from
+      // github.com/wppconnect-team/wa-version to pin the web build.
+      webVersionCache: process.env.WWEBJS_WEB_VERSION
+        ? { type: "remote", remotePath: process.env.WWEBJS_WEB_VERSION }
+        : undefined,
       puppeteer: {
         headless: true,
         // On a server we use the system Chromium (set via env in Docker);
@@ -227,16 +233,20 @@ class Engine extends EventEmitter {
   // ---------- auto-reply / flow bot ----------
   async handleIncoming(msg) {
     const from = msg.from || "";
-    if (msg.fromMe || msg.isStatus) return; // ignore own / status updates silently
-    if (!from.endsWith("@c.us") && !from.endsWith("@g.us")) return; // not a normal chat
 
-    // dedupe: the same message can arrive via both `message` and `message_create`
+    // dedupe first: the same message can arrive via both `message` and `message_create`
     const id = msg.id?._serialized || msg.id?.id;
     if (id) {
       if (this._handledMsgs.has(id)) return;
       this._handledMsgs.add(id);
       if (this._handledMsgs.size > 2000) this._handledMsgs = new Set([...this._handledMsgs].slice(-1000));
     }
+
+    // RAW event log (proves whether WhatsApp is delivering message events at all)
+    this.log("info", `· event ${msg.fromMe ? "OUT" : "IN"} from=${from.replace("@c.us", "")} "${(msg.body || "").slice(0, 30)}"`);
+
+    if (msg.fromMe || msg.isStatus) return; // don't reply to our own / status
+    if (!from.endsWith("@c.us") && !from.endsWith("@g.us")) return; // not a normal chat
 
     const name = msg._data?.notifyName || "";
     const who = name || from.replace("@c.us", "");
