@@ -54,7 +54,21 @@
     "maxPerRun": 0,
     "_maxPerRun_help": "Hard cap on messages per run (0 = no cap). Useful while warming up a new number.",
     "skipAlreadySent": true,
-    "_skipAlreadySent_help": "Reads results.csv and never messages the same number twice. Makes the run fully resumable."
+    "_skipAlreadySent_help": "Reads results.csv and never messages the same number twice. Makes the run fully resumable.",
+    "autoResume": true,
+    "_autoResume_help": "Crash-safe: if a campaign is interrupted (crash/restart/disconnect), resume it automatically once reconnected (already-sent are skipped).",
+    "banGuard": {
+      "enabled": true,
+      "sampleSize": 8,
+      "minDeliveredPct": 25,
+      "graceSeconds": 90,
+      "_help": "Ban guardrail: if fewer than minDeliveredPct of the last sampleSize messages get a delivered receipt within graceSeconds, auto-pause the campaign (your number may be throttled/blocked)."
+    }
+  },
+  "alerts": {
+    "enabled": false,
+    "number": "",
+    "_help": "If enabled, watitool sends a WhatsApp alert to this number when it reconnects after a disconnect or auto-pauses a campaign. Use international format, e.g. 2010xxxxxxxx."
   },
   "onlinePresence": true,
   "_onlinePresence_help": "Keep the account marked online while the campaign runs."

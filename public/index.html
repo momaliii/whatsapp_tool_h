@@ -56,6 +56,7 @@
       <div class="btnrow">
         <label class="btn">Import CSV<input type="file" id="csvFile" accept=".csv" hidden /></label>
         <button class="btn" id="btnValidate">Validate numbers</button>
+        <button class="btn" id="btnNonRepliers" title="Load contacts you messaged who never replied">↻ Non-repliers</button>
         <span class="muted" id="contactCount"></span>
       </div>
       <textarea id="contactsArea" spellcheck="false" rows="14" placeholder="number,name&#10;201001234567,Ahmed"></textarea>
@@ -145,6 +146,18 @@
       <div class="grid2">
         <label>From <input type="time" id="cfg_winStart" /></label>
         <label>To <input type="time" id="cfg_winEnd" /></label>
+      </div>
+
+      <h3>Reliability &amp; alerts</h3>
+      <p class="muted">Auto-reconnect if the session drops, auto-resume an interrupted campaign, and auto-pause if deliveries stall (possible block). Optionally get a WhatsApp alert.</p>
+      <div class="checks">
+        <label class="check"><input type="checkbox" id="cfg_autoResume" /> Auto-resume an interrupted campaign (crash-safe)</label>
+        <label class="check"><input type="checkbox" id="cfg_banGuard" /> Ban guardrail — auto-pause if deliveries stall</label>
+        <label class="check"><input type="checkbox" id="cfg_alerts" /> Send me a WhatsApp alert on disconnect / auto-pause</label>
+      </div>
+      <div class="grid2">
+        <label>Alert number (international) <input id="cfg_alertNumber" placeholder="2010xxxxxxxx" /></label>
+        <span></span>
       </div>
 
       <div class="btnrow">

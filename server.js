@@ -10,7 +10,7 @@ import { color, template } from "./src/utils.js";
 import { parse as parseCsv } from "csv-parse/sync";
 import { dataPath, MEDIA_DIR, ensureData } from "./src/paths.js";
 import { planReply, memStore } from "./src/bot.js";
-import { computeInsights, estimateDuration, contactHistory, suggestSettings } from "./src/analytics.js";
+import { computeInsights, estimateDuration, contactHistory, suggestSettings, nonRepliers } from "./src/analytics.js";
 import {
   requireAuth,
   authEnabled,
@@ -224,6 +224,12 @@ app.post("/api/schedule", (req, res) => {
   res.json({ ok: true, scheduledAt: at });
 });
 app.post("/api/schedule/cancel", (_req, res) => { engine.cancelSchedule(); res.json({ ok: true }); });
+
+// re-engage: contacts we messaged who never replied
+app.get("/api/non-repliers", (_req, res) => {
+  try { res.json(nonRepliers()); }
+  catch (e) { res.status(500).json({ error: e.message }); }
+});
 
 // per-contact history
 app.get("/api/history", (req, res) => {

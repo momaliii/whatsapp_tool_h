@@ -36,6 +36,7 @@ export async function runCampaign(client, opts = {}) {
     log: opts.on?.log || noop,
     item: opts.on?.item || noop,
     done: opts.on?.done || noop,
+    sent: opts.on?.sent || noop,
   };
 
   const cfg = loadJson("config.json");
@@ -137,12 +138,13 @@ export async function runCampaign(client, opts = {}) {
         appendResult(row._number, name, "dry-run", text.slice(0, 40));
         on.item({ number: row._number, name, status: "dry-run", detail: text.slice(0, 40) });
       } else {
-        await sendHumanLike(client, row._jid, text, media, campaign, cfg, (phase) =>
+        const sentMsg = await sendHumanLike(client, row._jid, text, media, campaign, cfg, (phase) =>
           on.progress({ index: i, total: work.length, stats, name, phase, wait: 0 })
         );
         stats.sent++;
         appendResult(row._number, name, "sent", media ? "media+text" : "text");
         on.item({ number: row._number, name, status: "sent", detail: media ? "media+text" : "text" });
+        on.sent(sentMsg?.id?._serialized);
       }
     } catch (err) {
       stats.failed++;
@@ -194,17 +196,19 @@ async function sendHumanLike(client, jid, text, media, campaign, cfg, onPhase = 
   }
 
   onPhase("sending");
+  let sent;
   if (media) {
     if (campaign.sendCaptionAsSeparateText) {
-      await client.sendMessage(jid, media);
+      sent = await client.sendMessage(jid, media);
       await sleep(randInt(800, 2000));
-      if (text) await client.sendMessage(jid, text);
+      if (text) sent = await client.sendMessage(jid, text);
     } else {
-      await client.sendMessage(jid, media, { caption: text || undefined });
+      sent = await client.sendMessage(jid, media, { caption: text || undefined });
     }
   } else {
-    await client.sendMessage(jid, text);
+    sent = await client.sendMessage(jid, text);
   }
+  return sent;
 }
 
 /** Hours/minutes of `now` in a given IANA timezone (server local if unset). */

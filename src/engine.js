@@ -5,7 +5,7 @@ import { runCampaign } from "./campaign.js";
 import { AUTH_DIR, dataPath } from "./paths.js";
 import { loadJson, sleep, randInt } from "./utils.js";
 import { planReply, fileStore } from "./bot.js";
-import { appendBotEvent } from "./analytics.js";
+import { appendBotEvent, appendInbound } from "./analytics.js";
 
 const { Client, LocalAuth, MessageMedia } = pkg;
 
@@ -29,6 +29,13 @@ class Engine extends EventEmitter {
     this.botStore = fileStore();
     this.botLastHandled = new Map(); // jid -> timestamp (cooldown)
     this._handledMsgs = new Set(); // message ids already processed (dedupe across events)
+    // reliability state
+    this.lastDisconnect = null;
+    this._reconnecting = false;
+    this._reconnectAttempts = 0;
+    this._wasDisconnected = false;
+    this._campaignSends = []; // {id, t} for ban-detection
+    this._ackById = new Map(); // msgId -> ack level
     this.scheduledAt = null;
     try {
       const s = JSON.parse(fs.readFileSync(dataPath("schedule.json"), "utf8"));
@@ -46,6 +53,8 @@ class Engine extends EventEmitter {
       stats: this.stats,
       logs: this.logs.slice(-200),
       scheduledAt: this.scheduledAt,
+      lastDisconnect: this.lastDisconnect,
+      reconnecting: this._reconnecting,
     };
   }
 
@@ -72,6 +81,76 @@ class Engine extends EventEmitter {
     this.persistSchedule();
     this.log("info", "⏰ Scheduled time reached — starting campaign.");
     this.run({ dryRun: false }).catch((e) => this.log("error", e.message));
+  }
+
+  // ---------- reliability: auto-reconnect, alerts, crash-safe resume, ban guard ----------
+  scheduleReconnect() {
+    if (this._reconnecting) return;
+    this._reconnecting = true;
+    const attempt = () => {
+      if (this.client || this.state === "ready") { this._reconnecting = false; return; }
+      this._reconnectAttempts++;
+      const delay = Math.min(60000, 5000 * this._reconnectAttempts); // backoff, cap 60s
+      this.log("info", `Reconnecting… (attempt ${this._reconnectAttempts}, in ${Math.round(delay / 1000)}s)`);
+      this._reconnectTimer = setTimeout(() => {
+        this.connect().catch(() => {});
+        if (!this.client) attempt(); // connect failed synchronously, retry
+      }, delay);
+    };
+    attempt();
+  }
+
+  /** Send a WhatsApp alert to the owner number (if configured + connected). */
+  async alertOwner(text) {
+    try {
+      const cfg = loadJson("config.json");
+      const num = (cfg.alerts?.number || "").replace(/\D/g, "");
+      if (!num || !cfg.alerts?.enabled || !this.client || this.state !== "ready") return;
+      await this.client.sendMessage(num + "@c.us", text);
+    } catch {}
+  }
+
+  /** After (re)connect, resume a campaign that was interrupted by a crash/restart. */
+  async maybeResume() {
+    if (this.state !== "ready") return;
+    let saved;
+    try { saved = JSON.parse(fs.readFileSync(dataPath("active-campaign.json"), "utf8")); } catch { return; }
+    if (!saved?.active || saved.dryRun) return;
+    let cfg = {};
+    try { cfg = loadJson("config.json"); } catch {}
+    if (cfg.safety?.autoResume === false) return;
+    this.log("info", "↻ Resuming an interrupted campaign (already-sent are skipped)…");
+    this.run({ dryRun: false }).catch((e) => this.log("error", e.message));
+  }
+
+  _setActiveCampaign(on, dryRun) {
+    try {
+      if (on) fs.writeFileSync(dataPath("active-campaign.json"), JSON.stringify({ active: true, dryRun, at: new Date().toISOString() }));
+      else fs.rmSync(dataPath("active-campaign.json"), { force: true });
+    } catch {}
+  }
+
+  /** Pause the campaign if deliveries have stalled (likely block/throttle). */
+  evaluateBanRisk() {
+    let cfg = {};
+    try { cfg = loadJson("config.json"); } catch {}
+    const g = cfg.safety?.banGuard || {};
+    if (g.enabled === false) return;
+    const sampleSize = +g.sampleSize || 8;
+    const minPct = +g.minDeliveredPct || 25;
+    const grace = (+g.graceSeconds || 90) * 1000;
+    const now = Date.now();
+    const mature = this._campaignSends.filter((s) => now - s.t > grace);
+    if (mature.length < sampleSize) return;
+    const recent = mature.slice(-sampleSize);
+    const delivered = recent.filter((s) => (this._ackById.get(s.id) || 0) >= 2).length;
+    const pct = Math.round((delivered / recent.length) * 100);
+    if (pct < minPct) {
+      this.log("error", `🛑 Ban guard: only ${pct}% of the last ${recent.length} messages were delivered — auto-pausing to protect your number.`);
+      this.alertOwner(`🛑 watitool auto-paused a campaign: deliveries stalled (${pct}% delivered). Your number may be throttled or blocked.`);
+      this.control.stopped = true;
+      this._banPaused = true;
+    }
   }
 
   emitUpdate() {
@@ -125,12 +204,27 @@ class Engine extends EventEmitter {
     client.on("ready", () => {
       this.qr = null;
       this.state = "ready";
+      this._reconnecting = false;
+      this._reconnectAttempts = 0;
       const info = client.info || {};
       this.me = {
         name: info.pushname || "",
         number: info.wid?.user || "",
       };
       this.log("info", `Connected as ${this.me.name || this.me.number}.`);
+      if (this._wasDisconnected) {
+        this._wasDisconnected = false;
+        this.log("info", "✓ Recovered from a disconnect.");
+        this.alertOwner(`✅ watitool reconnected (was down since ${new Date(this.lastDisconnect).toLocaleString()}).`);
+      }
+      // crash-safe: resume a campaign that was interrupted
+      setTimeout(() => this.maybeResume(), 4000);
+    });
+
+    // track delivery acks for the ban-detection guardrail
+    client.on("message_ack", (msg, ack) => {
+      const id = msg?.id?._serialized;
+      if (id) this._ackById.set(id, ack);
     });
 
     // incoming messages → auto-reply / flow bot.
@@ -145,11 +239,14 @@ class Engine extends EventEmitter {
     client.on("auth_failure", (m) =>
       this.log("error", "Auth failure: " + m + " — click Log out to clear the session, then Connect again."));
     client.on("disconnected", (r) => {
-      this.log("warn", "Disconnected: " + r);
+      this.log("warn", `⚠️ Disconnected: ${r}`);
+      this.lastDisconnect = new Date().toISOString();
+      this._wasDisconnected = true;
       this.state = "disconnected";
       this.client = null;
       this.me = null;
       this.emitUpdate();
+      this.scheduleReconnect();
     });
 
     client.initialize().catch((e) => {
@@ -187,6 +284,9 @@ class Engine extends EventEmitter {
     this.state = "running";
     this.stats = { sent: 0, failed: 0, skipped: 0, total: 0 };
     this.progress = { index: 0, total: 0, name: "", phase: "starting", wait: 0 };
+    this._campaignSends = [];
+    this._banPaused = false;
+    if (!dryRun) this._setActiveCampaign(true, dryRun); // crash-safe marker
     this.emitUpdate();
 
     try {
@@ -197,6 +297,11 @@ class Engine extends EventEmitter {
           start: (stats) => {
             this.stats = stats;
             this.emitUpdate();
+          },
+          sent: (msgId) => {
+            if (msgId) this._campaignSends.push({ id: msgId, t: Date.now() });
+            if (this._campaignSends.length > 200) this._campaignSends = this._campaignSends.slice(-100);
+            this.evaluateBanRisk();
           },
           progress: (p) => {
             this.progress = { index: p.index, total: p.total, name: p.name, phase: p.phase, wait: p.wait };
@@ -217,6 +322,8 @@ class Engine extends EventEmitter {
         },
       });
     } finally {
+      // clear the crash-safe marker only if it finished/stopped cleanly (not a ban-pause auto-stop)
+      if (!dryRun && !this._banPaused) this._setActiveCampaign(false);
       this.state = dryRun ? "disconnected" : "ready";
       if (dryRun && this.client) this.state = "ready";
       this.progress = { ...this.progress, phase: "idle", wait: 0 };
@@ -248,6 +355,9 @@ class Engine extends EventEmitter {
     if (msg.fromMe || msg.isStatus) return; // don't reply to our own / status
     // accept individual chats (@c.us), WhatsApp's newer LID addressing (@lid), and groups (@g.us)
     if (!from.endsWith("@c.us") && !from.endsWith("@lid") && !from.endsWith("@g.us")) return;
+
+    // record the real phone number as "replied" (for re-engage); @lid isn't the phone number
+    msg.getContact().then((c) => appendInbound(c?.number || from.replace(/@(c\.us|lid|g\.us)$/, ""))).catch(() => {});
 
     const name = msg._data?.notifyName || "";
     const who = name || from.replace(/@(c\.us|lid|g\.us)$/, "");

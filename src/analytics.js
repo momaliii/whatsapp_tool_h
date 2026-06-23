@@ -4,6 +4,7 @@ import { dataPath } from "./paths.js";
 import { toJid } from "./utils.js";
 
 const BOT_LOG = "bot-log.jsonl";
+const INBOUND_LOG = "inbound.jsonl";
 
 /** Append one bot-activity event (best-effort). */
 export function appendBotEvent(rec) {
@@ -11,6 +12,35 @@ export function appendBotEvent(rec) {
     const line = JSON.stringify({ time: new Date().toISOString(), ...rec }) + "\n";
     fs.appendFileSync(dataPath(BOT_LOG), line);
   } catch {}
+}
+
+/** Record that a phone number sent us an inbound message (for re-engage). */
+export function appendInbound(number) {
+  if (!number) return;
+  try {
+    fs.appendFileSync(dataPath(INBOUND_LOG), JSON.stringify({ time: new Date().toISOString(), number: String(number).replace(/\D/g, "") }) + "\n");
+  } catch {}
+}
+
+function readInbound() {
+  const set = new Set();
+  try {
+    for (const l of fs.readFileSync(dataPath(INBOUND_LOG), "utf8").split("\n")) {
+      if (!l) continue;
+      try { const n = JSON.parse(l).number; if (n) set.add(String(n)); } catch {}
+    }
+  } catch {}
+  return set;
+}
+
+/** Contacts we messaged ('sent') who never replied to us. */
+export function nonRepliers() {
+  const sent = new Map();
+  for (const r of readResults()) if (r.status === "sent" && r.number) sent.set(r.number, r.name || "");
+  const replied = readInbound();
+  const contacts = [];
+  for (const [number, name] of sent) if (!replied.has(number)) contacts.push({ number, name });
+  return { count: contacts.length, messaged: sent.size, replied: replied.size, contacts };
 }
 
 function readResults() {

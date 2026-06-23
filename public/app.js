@@ -142,6 +142,15 @@ $("btnSaveContacts").onclick = async () => {
     flashSaved("contactsSaved"); countContacts();
   } catch (e) { toast(e.message, true); }
 };
+$("btnNonRepliers").onclick = async () => {
+  try {
+    const r = await api("/api/non-repliers");
+    if (!r.count) return toast("No non-repliers yet (need past sends + replies tracked).");
+    const csv = "number,name\n" + r.contacts.map((c) => `${c.number},${(c.name || "").replace(/,/g, " ")}`).join("\n");
+    $("contactsArea").value = csv; countContacts();
+    toast(`Loaded ${r.count} non-repliers (of ${r.messaged} messaged) — review, then Save`);
+  } catch (e) { toast(e.message, true); }
+};
 $("btnValidate").onclick = async () => {
   // save first so server validates current text
   try { await api("/api/contacts", { method: "POST", headers: { "Content-Type": "text/csv" }, body: $("contactsArea").value }); } catch (e) { return toast(e.message, true); }
@@ -282,6 +291,10 @@ async function loadConfig() {
   $("cfg_winEnabled").checked = !!w.enabled;
   $("cfg_winStart").value = w.start || "09:00";
   $("cfg_winEnd").value = w.end || "21:00";
+  $("cfg_autoResume").checked = cfg.safety?.autoResume !== false;
+  $("cfg_banGuard").checked = cfg.safety?.banGuard?.enabled !== false;
+  $("cfg_alerts").checked = !!cfg.alerts?.enabled;
+  $("cfg_alertNumber").value = cfg.alerts?.number || "";
   $("cfg_tz").value = cfg.vars?.timezone || "";
   $("cfg_locale").value = cfg.vars?.locale || "";
   updateTzClock();
@@ -312,7 +325,10 @@ $("btnSaveSettings").onclick = async () => {
   cfg.delay = { ...cfg.delay, minSeconds: +$("cfg_dmin").value, maxSeconds: +$("cfg_dmax").value };
   cfg.batch = { ...cfg.batch, size: +$("cfg_bsize").value, restMinutes: +$("cfg_brest").value };
   cfg.typing = { ...cfg.typing, enabled: $("cfg_typing").checked, charsPerSecond: +$("cfg_cps").value };
-  cfg.safety = { ...cfg.safety, maxPerRun: +$("cfg_cap").value, checkRegistered: $("cfg_check").checked, skipAlreadySent: $("cfg_skip").checked };
+  cfg.safety = { ...cfg.safety, maxPerRun: +$("cfg_cap").value, checkRegistered: $("cfg_check").checked, skipAlreadySent: $("cfg_skip").checked,
+    autoResume: $("cfg_autoResume").checked,
+    banGuard: { ...cfg.safety?.banGuard, enabled: $("cfg_banGuard").checked } };
+  cfg.alerts = { ...cfg.alerts, enabled: $("cfg_alerts").checked, number: $("cfg_alertNumber").value.trim() };
   cfg.onlinePresence = $("cfg_online").checked;
   cfg.schedule = { ...cfg.schedule, window: { enabled: $("cfg_winEnabled").checked, start: $("cfg_winStart").value || "09:00", end: $("cfg_winEnd").value || "21:00" } };
   cfg.vars = { ...cfg.vars, timezone: $("cfg_tz").value, locale: $("cfg_locale").value.trim() };
