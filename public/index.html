@@ -16,19 +16,29 @@
     </div>
   </header>
 
-  <nav class="tabs">
-    <button class="tab active" data-tab="connect">1 · Connection</button>
-    <button class="tab" data-tab="contacts">2 · Contacts</button>
-    <button class="tab" data-tab="message">3 · Message</button>
-    <button class="tab" data-tab="settings">4 · Settings</button>
-    <button class="tab" data-tab="send">5 · Send</button>
-    <button class="tab" data-tab="insights">📊 Insights</button>
-    <button class="tab" data-tab="autoreply">🤖 Auto-reply</button>
-    <button class="tab" data-tab="flows">💬 Flows</button>
-    <button class="tab" data-tab="drip">📨 Drip</button>
-  </nav>
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="navgroup">
+        <div class="navlabel">Setup</div>
+        <button class="tab active" data-tab="connect"><span class="ti">🔗</span> Connection</button>
+        <button class="tab" data-tab="contacts"><span class="ti">👥</span> Contacts</button>
+        <button class="tab" data-tab="message"><span class="ti">✍️</span> Message</button>
+        <button class="tab" data-tab="settings"><span class="ti">⚙️</span> Settings</button>
+      </div>
+      <div class="navgroup">
+        <div class="navlabel">Campaign</div>
+        <button class="tab" data-tab="send"><span class="ti">🚀</span> Send</button>
+        <button class="tab" data-tab="insights"><span class="ti">📊</span> Insights</button>
+        <button class="tab" data-tab="drip"><span class="ti">📨</span> Drip</button>
+      </div>
+      <div class="navgroup">
+        <div class="navlabel">Automation</div>
+        <button class="tab" data-tab="autoreply"><span class="ti">🤖</span> Auto-reply</button>
+        <button class="tab" data-tab="flows"><span class="ti">💬</span> Flows</button>
+      </div>
+    </aside>
 
-  <main>
+    <main>
     <!-- CONNECTION -->
     <section class="panel active" id="tab-connect">
       <h2>Connect your WhatsApp</h2>
@@ -400,7 +410,8 @@
       <p class="hint">Tip: enable the sequence and connect WhatsApp — due steps go out automatically. Use <code>{{name}}</code> and <code>{{track:CODE}}</code> in step text.</p>
     </section>
 
-  </main>
+    </main>
+  </div>
 
   <div class="toast" id="toast"></div>
   <script src="app.js"></script>
