@@ -314,11 +314,23 @@
         <button class="btn ghost" data-add="message">💬 Message</button>
         <button class="btn ghost" data-add="menu">📋 Menu</button>
         <button class="btn ghost" data-add="question">❓ Question</button>
+        <button class="btn ghost" data-add="condition">🔀 Condition</button>
+        <button class="btn ghost" data-add="delay">⏱️ Delay</button>
         <button class="btn ghost" data-add="end">🏁 End</button>
       </div>
 
       <div class="fb-main">
-        <div class="fb-canvas" id="fbCanvas"><svg id="fbEdges"></svg></div>
+        <div class="fb-canvas" id="fbCanvas">
+          <svg id="fbEdges"></svg>
+          <div id="fbWorld"></div>
+          <div class="fb-zoom">
+            <button id="fbZoomOut" title="Zoom out">−</button>
+            <span id="fbZoomLbl">100%</span>
+            <button id="fbZoomIn" title="Zoom in">+</button>
+            <button id="fbFit" title="Reset view">⤢</button>
+          </div>
+          <div class="fb-hint muted">drag canvas to pan · scroll to zoom · click a line to delete it</div>
+        </div>
         <div class="fb-editor" id="fbEditor"></div>
       </div>
 

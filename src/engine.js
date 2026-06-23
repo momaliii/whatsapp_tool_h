@@ -299,6 +299,7 @@ class Engine extends EventEmitter {
 
   /** Send one planned action item to a chat, human-like. */
   async sendItem(jid, item, chat) {
+    if (item.type === "delay") { await sleep(Math.min(120, +item.seconds || 1) * 1000); return; }
     // prefer the chat object (routes correctly for @lid contacts); fall back to jid
     const send = (content, opts) =>
       chat ? chat.sendMessage(content, opts) : this.client.sendMessage(jid, content, opts);

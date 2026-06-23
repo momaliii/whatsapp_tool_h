@@ -90,12 +90,25 @@ export function compileFlow(flow) {
   };
   const kw = (s) => String(s || "").split(",").map((x) => x.trim()).filter(Boolean);
 
+  const msgItems = (d) => {
+    const items = [];
+    if (d.text) items.push({ type: "text", text: d.text });
+    for (const md of d.media || []) items.push({ type: md.voice ? "voice" : guessType(md.path), path: md.path, caption: md.caption });
+    return items;
+  };
+
   const steps = {};
   for (const n of nodes) {
     const d = n.data || {};
     if (n.type === "message") {
       const next = target(n.id);
-      steps[n.id] = { send: d.items?.length ? d.items : [{ type: "text", text: d.text || "" }], ...(next ? { next } : { end: true }) };
+      const items = msgItems(d);
+      steps[n.id] = { send: items.length ? items : [{ type: "text", text: "" }], ...(next ? { next } : { end: true }) };
+    } else if (n.type === "delay") {
+      const next = target(n.id);
+      steps[n.id] = { send: [{ type: "delay", seconds: +d.seconds || 3 }], ...(next ? { next } : { end: true }) };
+    } else if (n.type === "condition") {
+      steps[n.id] = { condition: { var: d.var || "answer", op: d.op || "contains", value: d.value || "" }, yes: target(n.id, "yes"), no: target(n.id, "no") };
     } else if (n.type === "menu") {
       const options = (d.options || [])
         .map((o, i) => ({ match: kw(o.match || o.label), next: target(n.id, "opt" + i) }))
@@ -104,7 +117,7 @@ export function compileFlow(flow) {
     } else if (n.type === "question") {
       steps[n.id] = { send: [{ type: "text", text: d.text || "" }], collect: d.var || "answer", next: target(n.id) };
     } else if (n.type === "end") {
-      steps[n.id] = { send: d.text ? [{ type: "text", text: d.text }] : [], end: true };
+      steps[n.id] = { send: msgItems(d), end: true };
     }
   }
   const trig = nodes.find((n) => n.type === "trigger");
@@ -122,6 +135,15 @@ export function compileFlow(flow) {
 function enterStep(from, flow, stepId, store, vars, opts, actions = []) {
   const step = flow.steps?.[stepId];
   if (!step) { store.del(from); return { handled: true, actions, ended: true }; }
+
+  // condition node: evaluate a variable and branch immediately (no message, no wait)
+  if (step.condition) {
+    const c = step.condition;
+    const v = String(vars[c.var] ?? "").toLowerCase().trim();
+    const val = String(c.value ?? "").toLowerCase().trim();
+    const pass = c.op === "exists" ? v.length > 0 : c.op === "equals" ? v === val : v.includes(val);
+    return enterStep(from, flow, pass ? step.yes : step.no, store, vars, opts, actions);
+  }
 
   for (const item of step.send || []) actions.push(renderItem(item, vars, opts));
 

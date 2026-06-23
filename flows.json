@@ -1,5 +1,5 @@
 {
-  "_comment": "Visual flows built in the Flow Builder tab. Each flow has a trigger (keywords) plus nodes (trigger/message/menu/question/end) and edges connecting them. The engine compiles this graph to run it. You can drag nodes and connect their ports on the canvas.",
+  "_comment": "Visual flows built in the Flow Builder tab. Each flow has a trigger (keywords) plus nodes (trigger/message/menu/question/condition/delay/end) and edges connecting their ports. The engine compiles this graph to run it.",
   "flows": [
     {
       "id": "main",
