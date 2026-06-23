@@ -1,0 +1,16 @@
+{
+  "_comment": "Drip sequences: timed follow-up messages from each contact's enrollment. afterDays/afterHours are measured from when the contact was enrolled (day 0 = immediately). Enroll contacts from the Drip tab. Variables like {{name}} work. If stopOnReply is true, a contact who replies is removed from the sequence.",
+  "sequences": [
+    {
+      "id": "welcome",
+      "name": "Welcome series",
+      "enabled": false,
+      "stopOnReply": true,
+      "steps": [
+        { "afterDays": 0, "afterHours": 0, "text": "Hi {{name}}! 👋 Thanks for connecting with us. Reply anytime if you need anything 🙂" },
+        { "afterDays": 3, "afterHours": 0, "text": "Hey {{name}}! Just checking in 💬 — here's a quick tip to get the most out of us…" },
+        { "afterDays": 7, "afterHours": 0, "text": "{{name}}, a little gift 🎁 — use code WELCOME10 for 10% off this week!" }
+      ]
+    }
+  ]
+}

@@ -93,6 +93,13 @@ export function template(text, row = {}, opts = {}) {
       const ck = Object.keys(row).find((k) => k.toLowerCase() === lk);
       if (ck) return row[ck] == null ? "" : String(row[ck]);
     }
+    if (lk === "track") {
+      // {{track:CODE}} → tracked short link with the contact appended for click attribution
+      const base = String(opts.publicUrl || "").replace(/\/$/, "");
+      if (!base) return "";
+      const num = opts.number || row.number || row._number || "";
+      return `${base}/l/${(arg || "").trim()}${num ? "?c=" + encodeURIComponent(num) : ""}`;
+    }
     if (lk === "random") return randomToken(arg ? arg.trim() : "");
     if (lk === "firstname") {
       const n = row.name || row.Name || row.firstname || "";

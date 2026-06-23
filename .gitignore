@@ -9,3 +9,8 @@ bot-state.json
 bot-log.jsonl
 schedule.json
 .DS_Store
+inbound.jsonl
+active-campaign.json
+drip-state.json
+links.json
+clicks.jsonl

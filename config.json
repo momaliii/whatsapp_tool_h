@@ -70,6 +70,8 @@
     "number": "",
     "_help": "If enabled, watitool sends a WhatsApp alert to this number when it reconnects after a disconnect or auto-pauses a campaign. Use international format, e.g. 2010xxxxxxxx."
   },
+  "publicUrl": "",
+  "_publicUrl_help": "Your deployed dashboard URL (e.g. https://whatsapptoolh-production.up.railway.app). Required for click-tracked short links — {{track:CODE}} in a message becomes <publicUrl>/l/CODE?c=<number>.",
   "onlinePresence": true,
   "_onlinePresence_help": "Keep the account marked online while the campaign runs."
 }

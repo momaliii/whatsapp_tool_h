@@ -33,6 +33,18 @@ function readInbound() {
   return set;
 }
 
+/** Map of phone number → latest inbound time (ms). Used for drip stop-on-reply. */
+export function lastInboundByNumber() {
+  const m = new Map();
+  try {
+    for (const l of fs.readFileSync(dataPath(INBOUND_LOG), "utf8").split("\n")) {
+      if (!l) continue;
+      try { const e = JSON.parse(l); const t = Date.parse(e.time); if (e.number && !isNaN(t)) m.set(String(e.number), Math.max(m.get(String(e.number)) || 0, t)); } catch {}
+    }
+  } catch {}
+  return m;
+}
+
 /** Contacts we messaged ('sent') who never replied to us. */
 export function nonRepliers() {
   const sent = new Map();

@@ -25,6 +25,7 @@
     <button class="tab" data-tab="insights">📊 Insights</button>
     <button class="tab" data-tab="autoreply">🤖 Auto-reply</button>
     <button class="tab" data-tab="flows">💬 Flows</button>
+    <button class="tab" data-tab="drip">📨 Drip</button>
   </nav>
 
   <main>
@@ -157,7 +158,7 @@
       </div>
       <div class="grid2">
         <label>Alert number (international) <input id="cfg_alertNumber" placeholder="2010xxxxxxxx" /></label>
-        <span></span>
+        <label>Public URL (for tracked links) <input id="cfg_publicUrl" placeholder="https://...railway.app" /></label>
       </div>
 
       <div class="btnrow">
@@ -254,6 +255,17 @@
           <button class="btn" type="submit">Look up</button>
         </form>
         <div id="histResult"></div>
+      </div>
+
+      <div class="chart-box lookup">
+        <h3>Short links &amp; click tracking</h3>
+        <form id="linkForm" class="histform">
+          <input id="linkUrl" placeholder="https://your-site.com/promo" />
+          <input id="linkName" placeholder="name (optional)" style="flex:0 0 140px" />
+          <button class="btn" type="submit">Create</button>
+        </form>
+        <div id="linksList"></div>
+        <p class="hint">Put <code>{{track:CODE}}</code> in any message — it becomes a tracked link and logs who clicks. Set your <b>Public URL</b> in Settings first.</p>
       </div>
       <div class="cols">
         <div class="chart-box">
@@ -361,6 +373,31 @@
           <p class="hint">The simulator runs the real bot engine against your <b>saved</b> auto-replies + flows — no WhatsApp needed. Try the trigger word, then reply to the menu.</p>
         </div>
       </div>
+    </section>
+
+    <!-- DRIP -->
+    <section class="panel" id="tab-drip">
+      <h2>Drip sequences <span class="muted">— timed follow-ups</span></h2>
+      <p class="muted">Send a series of messages over time (day 0 / 3 / 7…) measured from when each contact is enrolled. Enroll your contacts list and watitool sends each step when it's due — while connected and within your sending window. If "stop if they reply" is on, anyone who replies is removed.</p>
+
+      <div class="fb-bar">
+        <select id="seqSelect"></select>
+        <button class="btn" id="seqNew">+ New sequence</button>
+        <input id="seqName" placeholder="Sequence name" style="width:160px" />
+        <label class="check inline" style="gap:4px"><input type="checkbox" id="seqEnabled" /> on</label>
+        <label class="check inline" style="gap:4px"><input type="checkbox" id="seqStop" /> stop if they reply</label>
+        <button class="btn primary" id="seqSave">Save</button>
+        <span id="seqMsg" class="muted"></span>
+      </div>
+
+      <div id="seqSteps"></div>
+      <button class="btn" id="seqAddStep">+ Add step</button>
+
+      <div class="btnrow" style="margin-top:18px">
+        <button class="btn primary" id="seqEnroll">Enroll my contacts list →</button>
+        <span class="muted" id="seqStats"></span>
+      </div>
+      <p class="hint">Tip: enable the sequence and connect WhatsApp — due steps go out automatically. Use <code>{{name}}</code> and <code>{{track:CODE}}</code> in step text.</p>
     </section>
 
   </main>

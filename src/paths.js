@@ -24,7 +24,7 @@ export function ensureData() {
   fs.mkdirSync(DATA_DIR, { recursive: true });
   fs.mkdirSync(MEDIA_DIR, { recursive: true });
   if (DATA_DIR === APP_ROOT) return; // local/VPS: defaults already present
-  for (const f of ["config.json", "campaign.json", "contacts.csv", "autoreply.json", "flows.json"]) {
+  for (const f of ["config.json", "campaign.json", "contacts.csv", "autoreply.json", "flows.json", "sequences.json"]) {
     const dest = dataPath(f);
     const src = path.join(APP_ROOT, f);
     if (!fs.existsSync(dest) && fs.existsSync(src)) fs.copyFileSync(src, dest);

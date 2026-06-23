@@ -295,6 +295,7 @@ async function loadConfig() {
   $("cfg_banGuard").checked = cfg.safety?.banGuard?.enabled !== false;
   $("cfg_alerts").checked = !!cfg.alerts?.enabled;
   $("cfg_alertNumber").value = cfg.alerts?.number || "";
+  $("cfg_publicUrl").value = cfg.publicUrl || "";
   $("cfg_tz").value = cfg.vars?.timezone || "";
   $("cfg_locale").value = cfg.vars?.locale || "";
   updateTzClock();
@@ -329,6 +330,7 @@ $("btnSaveSettings").onclick = async () => {
     autoResume: $("cfg_autoResume").checked,
     banGuard: { ...cfg.safety?.banGuard, enabled: $("cfg_banGuard").checked } };
   cfg.alerts = { ...cfg.alerts, enabled: $("cfg_alerts").checked, number: $("cfg_alertNumber").value.trim() };
+  cfg.publicUrl = $("cfg_publicUrl").value.trim().replace(/\/$/, "");
   cfg.onlinePresence = $("cfg_online").checked;
   cfg.schedule = { ...cfg.schedule, window: { enabled: $("cfg_winEnabled").checked, start: $("cfg_winStart").value || "09:00", end: $("cfg_winEnd").value || "21:00" } };
   cfg.vars = { ...cfg.vars, timezone: $("cfg_tz").value, locale: $("cfg_locale").value.trim() };
@@ -369,6 +371,7 @@ async function loadInsights() {
     renderDonut(d.statusBreakdown);
     renderTriggers(d.bot.topTriggers);
     renderRecent(d.recent);
+    loadLinks();
     $("insStamp").textContent = "Updated " + new Date(d.generatedAt).toLocaleTimeString();
   } catch (e) { toast(e.message, true); }
 }
@@ -673,6 +676,79 @@ $("simForm").onsubmit = async (e) => {
 };
 $("simReset").onclick = simReset;
 
+// ---------- drip sequences ----------
+let seqs = [], seqCur = 0;
+const seq = () => seqs[seqCur];
+async function loadDrip() {
+  try {
+    const d = await api("/api/sequences");
+    seqs = d.sequences || [];
+    if (!seqs.length) seqs = [blankSeq()];
+    seqCur = Math.min(seqCur, seqs.length - 1);
+    renderSeq(d.stats);
+  } catch (e) {}
+}
+function blankSeq() { return { id: "seq_" + Math.random().toString(36).slice(2, 7), name: "New sequence", enabled: false, stopOnReply: true, steps: [{ afterDays: 0, afterHours: 0, text: "Hi {{name}}! 👋" }] }; }
+function renderSeq(stats) {
+  $("seqSelect").innerHTML = seqs.map((s, i) => `<option value="${i}" ${i === seqCur ? "selected" : ""}>${escapeHtml(s.name || "sequence")}</option>`).join("");
+  $("seqName").value = seq().name || "";
+  $("seqEnabled").checked = seq().enabled !== false;
+  $("seqStop").checked = seq().stopOnReply !== false;
+  $("seqSteps").innerHTML = (seq().steps || []).map((st, i) => `
+    <div class="seq-step">
+      <div class="seq-when">after <input type="number" min="0" data-si="${i}" data-sf="afterDays" value="${st.afterDays || 0}" style="width:58px"> days
+        <input type="number" min="0" data-si="${i}" data-sf="afterHours" value="${st.afterHours || 0}" style="width:58px"> hrs
+        <button class="seq-del" data-sdel="${i}" title="Remove step">✕</button></div>
+      <textarea data-si="${i}" data-sf="text" rows="2" placeholder="Message…">${escapeHtml(st.text || "")}</textarea>
+    </div>`).join("");
+  $("seqSteps").querySelectorAll("[data-si]").forEach((inp) => inp.addEventListener("input", () => {
+    const v = inp.dataset.sf === "text" ? inp.value : +inp.value || 0;
+    seq().steps[+inp.dataset.si][inp.dataset.sf] = v;
+  }));
+  $("seqSteps").querySelectorAll("[data-sdel]").forEach((b) => b.onclick = () => { seq().steps.splice(+b.dataset.sdel, 1); renderSeq(); });
+  if (stats) $("seqStats").textContent = `${stats.active} active · ${stats.done} done · ${stats.cancelled} stopped`;
+}
+$("seqSelect").onchange = (e) => { seqCur = +e.target.value; renderSeq(); };
+$("seqNew").onclick = () => { seqs.push(blankSeq()); seqCur = seqs.length - 1; renderSeq(); };
+$("seqName").oninput = () => { seq().name = $("seqName").value; };
+$("seqAddStep").onclick = () => { seq().steps.push({ afterDays: 3, afterHours: 0, text: "" }); renderSeq(); };
+$("seqSave").onclick = async () => {
+  seq().name = $("seqName").value || "sequence";
+  seq().enabled = $("seqEnabled").checked;
+  seq().stopOnReply = $("seqStop").checked;
+  try { await api("/api/sequences", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sequences: seqs }) }); $("seqMsg").innerHTML = '<span style="color:var(--green)">✓ saved</span>'; }
+  catch (e) { toast(e.message, true); }
+};
+$("seqEnroll").onclick = async () => {
+  await $("seqSave").onclick();
+  if (!confirm("Enroll your whole contacts list into this sequence? Day-0 messages go out shortly (if enabled & connected).")) return;
+  try {
+    const r = await api("/api/sequences/enroll", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sequenceId: seq().id }) });
+    toast(`Enrolled ${r.added} contact(s)`); loadDrip();
+  } catch (e) { toast(e.message, true); }
+};
+document.querySelector('.tab[data-tab="drip"]').addEventListener("click", loadDrip);
+
+// ---------- short links ----------
+async function loadLinks() {
+  try {
+    const d = await api("/api/links");
+    const base = d.publicUrl || "(set Public URL in Settings)";
+    $("linksList").innerHTML = d.links.length
+      ? d.links.map((l) => `<div class="r"><span class="who"><code>${escapeHtml(l.code)}</code> → ${escapeHtml(l.url.slice(0, 36))}</span><span class="tag sent">${l.clicks} clicks · ${l.uniqueContacts} ppl</span></div>`).join("")
+      : '<p class="muted">No links yet.</p>';
+  } catch (e) {}
+}
+$("linkForm").onsubmit = async (e) => {
+  e.preventDefault();
+  const url = $("linkUrl").value.trim(); if (!url) return;
+  try {
+    const l = await api("/api/links", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url, name: $("linkName").value.trim() }) });
+    toast(`Created — use {{track:${l.code}}} in messages`);
+    $("linkUrl").value = ""; $("linkName").value = ""; loadLinks();
+  } catch (err) { toast(err.message, true); }
+};
+
 // ---------- sign out ----------
 $("btnSignout").onclick = async () => {
   try { await api("/api/signout", { method: "POST" }); } catch {}
@@ -695,5 +771,6 @@ async function initAuthUI() {
     simReset();
     loadInsights();
     loadEta();
+    loadDrip();
   } catch (e) { toast("Load error: " + e.message, true); }
 })();

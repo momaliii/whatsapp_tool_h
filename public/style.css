@@ -267,6 +267,13 @@ textarea { resize: vertical; font-family: ui-monospace, SFMono-Regular, Menlo, m
 .fb-opt input { flex: 1; min-width: 0; }
 .fb-optdel { background: none; border: none; color: var(--red); cursor: pointer; }
 
+/* drip steps */
+.seq-step { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px; margin-bottom: 10px; }
+.seq-when { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); margin-bottom: 8px; }
+.seq-when input { padding: 5px 7px; }
+.seq-del { margin-left: auto; background: none; border: none; color: var(--red); cursor: pointer; font-size: 14px; }
+.seq-step textarea { width: 100%; }
+
 /* chat simulator */
 .sim {
   background: var(--panel); border: 1px solid var(--line); border-radius: 10px;

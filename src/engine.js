@@ -3,9 +3,12 @@ import fs from "node:fs";
 import pkg from "whatsapp-web.js";
 import { runCampaign } from "./campaign.js";
 import { AUTH_DIR, dataPath } from "./paths.js";
-import { loadJson, sleep, randInt } from "./utils.js";
+import { loadJson, sleep, randInt, template } from "./utils.js";
 import { planReply, fileStore } from "./bot.js";
-import { appendBotEvent, appendInbound } from "./analytics.js";
+import { appendBotEvent, appendInbound, lastInboundByNumber } from "./analytics.js";
+import { dueList, markSent, cancel as cancelDrip } from "./drip.js";
+import { appendResult } from "./utils.js";
+import { withinWindow } from "./campaign.js";
 
 const { Client, LocalAuth, MessageMedia } = pkg;
 
@@ -42,6 +45,8 @@ class Engine extends EventEmitter {
       if (s.at) this.scheduledAt = s.at;
     } catch {}
     this._scheduleTick = setInterval(() => this.checkSchedule(), 30000);
+    this._dripTick = setInterval(() => this.processDrip().catch(() => {}), 60000);
+    this._dripBusy = false;
   }
 
   snapshot() {
@@ -151,6 +156,51 @@ class Engine extends EventEmitter {
       this.control.stopped = true;
       this._banPaused = true;
     }
+  }
+
+  /** Send any drip-sequence steps that are due (called on a timer). */
+  async processDrip() {
+    if (this._dripBusy || this.state !== "ready" || !this.client) return;
+    let cfg = {};
+    try { cfg = loadJson("config.json"); } catch {}
+    if (cfg.schedule?.window?.enabled && !withinWindow(cfg.schedule.window, cfg.vars?.timezone)) return;
+    const due = dueList(Date.now());
+    if (!due.length) return;
+    this._dripBusy = true;
+    try {
+      const inbound = lastInboundByNumber();
+      let sent = 0;
+      for (const d of due) {
+        if (sent >= 25) break; // per-tick cap so a backlog doesn't blast
+        const { k, enr, step, seq } = d;
+        if (seq.stopOnReply && (inbound.get(enr.number) || 0) > enr.enrolledAt) {
+          cancelDrip(k);
+          this.log("info", `Drip: ${enr.name || enr.number} replied — removed from "${seq.name}".`);
+          continue;
+        }
+        try {
+          const vars = { name: enr.name || "", ...(enr.vars || {}) };
+          const text = template(step.text || "", vars, { locale: cfg.vars?.locale, timezone: cfg.vars?.timezone, publicUrl: cfg.publicUrl, number: enr.number });
+          const jid = enr.number + "@c.us";
+          if ((step.media || []).length) {
+            for (const md of step.media) {
+              const file = dataPath(md.path);
+              if (fs.existsSync(file)) await this.client.sendMessage(jid, MessageMedia.fromFilePath(file), { caption: text || undefined, sendAudioAsVoice: md.voice });
+            }
+          } else if (text) {
+            await this.client.sendMessage(jid, text);
+          }
+          markSent(k, Date.now());
+          appendResult(enr.number, enr.name, "drip", `${seq.name} step ${d.stepIndex + 1}`);
+          this.log("info", `Drip → ${enr.name || enr.number}: "${seq.name}" step ${d.stepIndex + 1}/${d.total}`);
+          sent++;
+          await sleep(randInt(6000, 16000));
+        } catch (e) {
+          this.log("error", `Drip send failed for ${enr.number}: ${e.message || e}`);
+        }
+      }
+      if (sent) this.emitUpdate();
+    } finally { this._dripBusy = false; }
   }
 
   emitUpdate() {

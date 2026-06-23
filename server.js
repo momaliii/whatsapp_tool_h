@@ -11,6 +11,8 @@ import { parse as parseCsv } from "csv-parse/sync";
 import { dataPath, MEDIA_DIR, ensureData } from "./src/paths.js";
 import { planReply, memStore } from "./src/bot.js";
 import { computeInsights, estimateDuration, contactHistory, suggestSettings, nonRepliers } from "./src/analytics.js";
+import { loadSequences, saveSequences, enroll, stats as dripStats } from "./src/drip.js";
+import { createLink, findLink, logClick, linksWithStats } from "./src/links.js";
 import {
   requireAuth,
   authEnabled,
@@ -32,6 +34,14 @@ const app = express();
 app.set("trust proxy", true);
 app.use(express.json({ limit: "2mb" }));
 app.use(express.text({ type: "text/csv", limit: "5mb" }));
+
+// ---------- public short-link redirect + click tracking (no login) ----------
+app.get("/l/:code", (req, res) => {
+  const link = findLink(req.params.code);
+  if (!link) return res.status(404).send("Link not found.");
+  logClick(link.code, req.query.c, req.headers["user-agent"]);
+  res.redirect(link.url);
+});
 
 // ---------- public pages (no login required) ----------
 app.get("/", (_req, res) => res.sendFile(path.join(PUBLIC, "home.html")));
@@ -224,6 +234,31 @@ app.post("/api/schedule", (req, res) => {
   res.json({ ok: true, scheduledAt: at });
 });
 app.post("/api/schedule/cancel", (_req, res) => { engine.cancelSchedule(); res.json({ ok: true }); });
+
+// ---------- drip sequences ----------
+app.get("/api/sequences", (_req, res) => res.json({ ...loadSequences(), stats: dripStats() }));
+app.post("/api/sequences", (req, res) => {
+  try { saveSequences({ sequences: req.body.sequences || [] }); res.json({ ok: true }); }
+  catch (e) { res.status(500).json({ error: e.message }); }
+});
+app.post("/api/sequences/enroll", (req, res) => {
+  try {
+    const cfg = readJson("config.json");
+    let contacts = req.body.contacts;
+    if (!contacts) {
+      contacts = parseCsv(fs.readFileSync(dataPath("contacts.csv"), "utf8"), { columns: true, skip_empty_lines: true, trim: true });
+    }
+    const added = enroll(req.body.sequenceId, contacts, cfg.countryCode, Date.now());
+    res.json({ ok: true, added });
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+// ---------- short links ----------
+app.get("/api/links", (_req, res) => res.json({ links: linksWithStats(), publicUrl: (readJson("config.json").publicUrl || "") }));
+app.post("/api/links", (req, res) => {
+  try { res.json(createLink(req.body.url, req.body.name)); }
+  catch (e) { res.status(400).json({ error: e.message }); }
+});
 
 // re-engage: contacts we messaged who never replied
 app.get("/api/non-repliers", (_req, res) => {

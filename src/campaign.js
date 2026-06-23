@@ -117,6 +117,8 @@ export async function runCampaign(client, opts = {}) {
     const text = template(pick([].concat(campaign.message)), row, {
       locale: cfg.vars?.locale,
       timezone: cfg.vars?.timezone,
+      publicUrl: cfg.publicUrl,
+      number: row._number,
     });
 
     on.progress({ index: i, total: work.length, stats, name, phase: "checking", wait: 0 });
