@@ -243,13 +243,14 @@ class Engine extends EventEmitter {
     }
 
     // RAW event log (proves whether WhatsApp is delivering message events at all)
-    this.log("info", `· event ${msg.fromMe ? "OUT" : "IN"} from=${from.replace("@c.us", "")} "${(msg.body || "").slice(0, 30)}"`);
+    this.log("info", `· event ${msg.fromMe ? "OUT" : "IN"} from=${from.replace(/@(c\.us|lid|g\.us)$/, "")} "${(msg.body || "").slice(0, 30)}"`);
 
     if (msg.fromMe || msg.isStatus) return; // don't reply to our own / status
-    if (!from.endsWith("@c.us") && !from.endsWith("@g.us")) return; // not a normal chat
+    // accept individual chats (@c.us), WhatsApp's newer LID addressing (@lid), and groups (@g.us)
+    if (!from.endsWith("@c.us") && !from.endsWith("@lid") && !from.endsWith("@g.us")) return;
 
     const name = msg._data?.notifyName || "";
-    const who = name || from.replace("@c.us", "");
+    const who = name || from.replace(/@(c\.us|lid|g\.us)$/, "");
     const preview = (msg.body || "").slice(0, 50);
     this.log("info", `📩 incoming from ${who}: "${preview}"`);
 
@@ -283,20 +284,25 @@ class Engine extends EventEmitter {
       catch (e) { this.log("error", `bot send failed: ${e.message || e}`); }
       await sleep(randInt(700, 1800));
     }
+    const shortFrom = from.replace(/@(c\.us|lid|g\.us)$/, "");
     appendBotEvent({
-      from: from.replace("@c.us", ""),
+      from: shortFrom,
       name,
       kind: plan.kind || "autoreply",
       flow: plan.flow,
       label: plan.label,
       actions: plan.actions.length,
     });
-    this.log("info", `🤖 replied to ${name || from.replace("@c.us", "")} (${plan.actions.length} msg)`);
+    this.log("info", `🤖 replied to ${name || shortFrom} (${plan.actions.length} msg)`);
     this.emitUpdate();
   }
 
   /** Send one planned action item to a chat, human-like. */
   async sendItem(jid, item, chat) {
+    // prefer the chat object (routes correctly for @lid contacts); fall back to jid
+    const send = (content, opts) =>
+      chat ? chat.sendMessage(content, opts) : this.client.sendMessage(jid, content, opts);
+
     const typeText = item.text;
     if (typeText && chat) {
       try {
@@ -310,14 +316,14 @@ class Engine extends EventEmitter {
       if (!fs.existsSync(file)) throw new Error(`media not found: ${item.path}`);
       const media = MessageMedia.fromFilePath(file);
       const asVoice = item.type === "voice" || item.voice === true;
-      await this.client.sendMessage(jid, media, {
+      await send(media, {
         caption: item.caption || (item.type !== "voice" ? item.text : undefined) || undefined,
         sendAudioAsVoice: asVoice,
       });
       // if text accompanies a voice note, send it separately
-      if (asVoice && item.text) await this.client.sendMessage(jid, item.text);
+      if (asVoice && item.text) await send(item.text);
     } else if (typeText) {
-      await this.client.sendMessage(jid, typeText);
+      await send(typeText);
     }
   }
 }
