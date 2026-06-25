@@ -277,6 +277,31 @@ export function contactHistory(query, countryCode) {
   return { number, name, count: items.length, items };
 }
 
+/** When contacts reply — a day-of-week × hour heatmap (from inbound activity). */
+export function bestTimeHeatmap(timezone) {
+  const grid = Array.from({ length: 7 }, () => new Array(24).fill(0));
+  let max = 0, total = 0;
+  let lines = [];
+  try { lines = fs.readFileSync(dataPath("inbound.jsonl"), "utf8").split("\n").filter(Boolean); } catch {}
+  for (const l of lines) {
+    let iso; try { iso = JSON.parse(l).time; } catch { continue; }
+    const d = new Date(iso); if (isNaN(d)) continue;
+    let day, hour;
+    if (timezone) {
+      try {
+        const p = new Intl.DateTimeFormat("en-US", { timeZone: timezone, weekday: "short", hour: "2-digit", hour12: false }).formatToParts(d);
+        const wd = p.find((x) => x.type === "weekday").value;
+        day = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(wd);
+        hour = +p.find((x) => x.type === "hour").value % 24;
+      } catch { day = d.getDay(); hour = d.getHours(); }
+    } else { day = d.getDay(); hour = d.getHours(); }
+    if (day < 0) continue;
+    grid[day][hour]++; total++;
+    if (grid[day][hour] > max) max = grid[day][hour];
+  }
+  return { grid, max, total };
+}
+
 /** Aggregate everything the Insights tab needs, filtered to the last `days`. */
 export function computeInsights({ days = 30 } = {}) {
   let contacts = 0;
@@ -327,6 +352,9 @@ export function computeInsights({ days = 30 } = {}) {
     ...events.map((e) => ({ time: e.time, kind: "bot", status: e.kind, who: e.name || e.from || "", detail: e.label || "" })),
   ].filter((x) => x.time).sort((a, b) => (a.time < b.time ? 1 : -1)).slice(0, 25);
 
+  let tz;
+  try { tz = JSON.parse(fs.readFileSync(dataPath("config.json"), "utf8")).vars?.timezone || undefined; } catch {}
+
   return {
     days,
     totals: { contacts, sent, failed, skipped, deliveryRate, botReplies: events.length, campaignMessages: results.length },
@@ -334,6 +362,7 @@ export function computeInsights({ days = 30 } = {}) {
     timeline,
     bot: { total: events.length, byKind, topTriggers },
     recent,
+    heatmap: bestTimeHeatmap(tz),
     generatedAt: new Date().toISOString(),
   };
 }

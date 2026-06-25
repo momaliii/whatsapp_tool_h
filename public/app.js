@@ -28,6 +28,15 @@ document.querySelectorAll(".tab").forEach((tab) => {
     tab.classList.add("active");
     $("tab-" + tab.dataset.tab).classList.add("active");
   };
+  // give each panel header the matching nav icon (cloned)
+  const panel = $("tab-" + tab.dataset.tab);
+  const h2 = panel && panel.querySelector("h2");
+  const svg = tab.querySelector("svg");
+  if (h2 && svg && !h2.querySelector(".h2i")) {
+    const clone = svg.cloneNode(true);
+    clone.setAttribute("class", "h2i");
+    h2.prepend(clone);
+  }
 });
 
 // ---------- connection ----------
@@ -98,6 +107,14 @@ function applyState(s) {
   $("btnStart").disabled = running;
   $("btnDryRun").disabled = running;
   $("btnStop").disabled = !running;
+  $("btnPause").disabled = !running;
+  $("btnPause").dataset.paused = s.paused ? "1" : "";
+  $("btnPause").lastChild.textContent = s.paused ? " Resume" : " Pause";
+  $("btnPause").classList.toggle("primary", !!s.paused);
+  // read receipts
+  const rc = s.receipts || {};
+  $("sDelivered").textContent = rc.delivered || 0;
+  $("sRead").textContent = rc.read || 0;
 
   // logs
   const log = $("log");
@@ -376,6 +393,10 @@ $("btnDryRun").onclick = async () => {
   catch (e) { toast(e.message, true); }
 };
 $("btnStop").onclick = async () => { try { await api("/api/stop", { method: "POST" }); } catch (e) { toast(e.message, true); } };
+$("btnPause").onclick = async () => {
+  const paused = $("btnPause").dataset.paused === "1";
+  try { await api(paused ? "/api/resume" : "/api/pause", { method: "POST" }); } catch (e) { toast(e.message, true); }
+};
 $("btnClearResults").onclick = async () => {
   if (!confirm("Reset send history? Already-messaged numbers will be eligible again.")) return;
   try { await api("/api/results/clear", { method: "POST" }); loadResults(); toast("History cleared"); }
@@ -398,6 +419,7 @@ async function loadInsights() {
     renderDonut(d.statusBreakdown);
     renderTriggers(d.bot.topTriggers);
     renderRecent(d.recent);
+    renderHeatmap(d.heatmap);
     loadLinks();
     $("insStamp").textContent = "Updated " + new Date(d.generatedAt).toLocaleTimeString();
   } catch (e) { toast(e.message, true); }
@@ -467,6 +489,22 @@ function renderRecent(recent) {
     const detail = r.detail ? " · " + escapeHtml(String(r.detail).slice(0, 30)) : "";
     return `<div class="row"><span>${icon}</span><span class="tag ${r.status}">${r.status}</span><span class="who">${who}${detail}</span><span class="t">${ts}</span></div>`;
   }).join("");
+}
+function renderHeatmap(h) {
+  const el = $("heatmap");
+  if (!h || !h.total) { el.innerHTML = '<div class="empty-chart">No reply activity yet — the heatmap fills in as people message you.</div>'; return; }
+  const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const cell = (v) => {
+    const a = h.max ? v / h.max : 0;
+    const bg = v ? `rgba(22,163,74,${(0.15 + a * 0.85).toFixed(2)})` : "var(--panel2)";
+    return `<td title="${v} repl${v === 1 ? "y" : "ies"}" style="background:${bg}"></td>`;
+  };
+  let rows = "";
+  for (let d = 0; d < 7; d++) {
+    rows += `<tr><th>${days[d]}</th>${h.grid[d].map(cell).join("")}</tr>`;
+  }
+  const hours = Array.from({ length: 24 }, (_, i) => `<th>${i % 6 === 0 ? i : ""}</th>`).join("");
+  el.innerHTML = `<table class="heat"><tr><th></th>${hours}</tr>${rows}</table><div class="hint" style="margin-top:6px">Darker = more replies at that hour. Schedule your sends just before the busy windows.</div>`;
 }
 $("btnRefreshIns").onclick = loadInsights;
 document.querySelector('.tab[data-tab="insights"]').addEventListener("click", loadInsights);

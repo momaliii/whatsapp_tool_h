@@ -240,6 +240,7 @@
       <div class="btnrow">
         <button class="btn" id="btnDryRun"><svg class="i" viewBox="0 0 24 24"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg> Dry run</button>
         <button class="btn primary" id="btnStart"><svg class="i" viewBox="0 0 24 24"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg> Start sending</button>
+        <button class="btn" id="btnPause" disabled><svg class="i" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg> Pause</button>
         <button class="btn danger" id="btnStop" disabled><svg class="i" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/></svg> Stop</button>
         <button class="btn ghost" id="btnClearResults">Reset history</button>
       </div>
@@ -252,6 +253,7 @@
             <span class="pill ok">✓ <b id="sSent">0</b></span>
             <span class="pill bad">✗ <b id="sFailed">0</b></span>
             <span class="pill warn">⊘ <b id="sSkipped">0</b></span>
+            <span class="pill rcpt" title="delivered / read">✓✓ <b id="sDelivered">0</b> · <b id="sRead">0</b> read</span>
           </span>
           <span id="phase" class="phase">idle</span>
         </div>
@@ -328,6 +330,10 @@
           <h3>Recent activity</h3>
           <div id="insRecent" class="feed"></div>
         </div>
+      </div>
+      <div class="chart-box" style="margin-top:18px">
+        <h3>Best time to reach people <span class="muted">(when they reply)</span></h3>
+        <div id="heatmap"></div>
       </div>
       <p class="hint" id="insStamp"></p>
     </section>

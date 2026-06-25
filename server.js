@@ -341,6 +341,8 @@ app.post("/api/run", async (req, res) => {
 });
 
 app.post("/api/stop", (_req, res) => { engine.stop(); res.json({ ok: true }); });
+app.post("/api/pause", (_req, res) => { engine.pause(); res.json({ ok: true }); });
+app.post("/api/resume", (_req, res) => { engine.resume(); res.json({ ok: true }); });
 
 // ---------- results ----------
 app.get("/api/results", (_req, res) => {

@@ -60,7 +60,33 @@ class Engine extends EventEmitter {
       scheduledAt: this.scheduledAt,
       lastDisconnect: this.lastDisconnect,
       reconnecting: this._reconnecting,
+      paused: !!this.control?.paused,
+      receipts: this.receipts(),
     };
+  }
+
+  /** Live delivered/read counts for the running campaign (from ack tracking). */
+  receipts() {
+    let delivered = 0, read = 0;
+    for (const s of this._campaignSends || []) {
+      const a = this._ackById.get(s.id) || 0;
+      if (a >= 2) delivered++;
+      if (a >= 3) read++;
+    }
+    return { delivered, read };
+  }
+
+  pause() {
+    if (this.state !== "running" || !this.control) return;
+    this.control.paused = true;
+    this.log("warn", "⏸ Paused — resume to continue.");
+    this.emitUpdate();
+  }
+  resume() {
+    if (!this.control) return;
+    this.control.paused = false;
+    this.log("info", "▶ Resumed.");
+    this.emitUpdate();
   }
 
   // ---------- scheduled start ----------
@@ -329,7 +355,7 @@ class Engine extends EventEmitter {
     if (!dryRun && this.state !== "ready")
       throw new Error("Connect to WhatsApp first (scan the QR).");
 
-    this.control = { stopped: false };
+    this.control = { stopped: false, paused: false };
     this.lastRunResults = [];
     this.state = "running";
     this.stats = { sent: 0, failed: 0, skipped: 0, total: 0 };

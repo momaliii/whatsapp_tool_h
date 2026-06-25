@@ -117,6 +117,12 @@ export async function runCampaign(client, opts = {}) {
       on.log("warn", "Stopped by user.");
       break;
     }
+    // pause support — hold here until resumed
+    while (control.paused && !control.stopped) {
+      on.progress({ index: i, total: work.length, stats, name: "paused", phase: "paused", wait: 0 });
+      await sleep(1000);
+    }
+    if (control.stopped) { on.log("warn", "Stopped by user."); break; }
 
     // pause outside the allowed sending window
     if (cfg.schedule?.window?.enabled && !dryRun) {
