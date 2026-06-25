@@ -190,11 +190,23 @@ async function loadAudience(url, label) {
 async function loadLists() {
   try {
     const d = await api("/api/lists");
-    $("listSelect").innerHTML = '<option value="">Saved lists…</option>' +
-      d.lists.map((l) => `<option value="${l.id}">${escapeHtml(l.name)} (${l.count})</option>`).join("");
+    const opts = d.lists.map((l) => `<option value="${l.id}">${escapeHtml(l.name)} (${l.count})</option>`).join("");
+    $("listSelect").innerHTML = '<option value="">Saved lists…</option>' + opts;
     $("btnDeleteList").hidden = true;
+    if ($("sendListSelect")) $("sendListSelect").innerHTML = '<option value="">Current contacts</option>' + opts;
   } catch {}
 }
+$("sendListSelect").onchange = async (e) => {
+  const id = e.target.value;
+  if (!id) { $("sendListInfo").textContent = ""; loadEta(); return; }
+  try {
+    await api("/api/lists/apply", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) });
+    await loadContacts();
+    const name = e.target.options[e.target.selectedIndex].textContent;
+    $("sendListInfo").textContent = "loaded: " + name;
+    loadEta(); toast("Audience set to " + name);
+  } catch (err) { toast(err.message, true); }
+};
 $("btnSaveList").onclick = async () => {
   const name = prompt("Save current contacts as list — name:", "My list");
   if (!name) return;
