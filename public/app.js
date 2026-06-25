@@ -411,6 +411,15 @@ async function loadConfig() {
   $("cfg_tz").value = cfg.vars?.timezone || "";
   $("cfg_locale").value = cfg.vars?.locale || "";
   updateTzClock();
+  loadSendOpts();
+  highlightPreset();
+}
+function highlightPreset() {
+  const cur = { dmin: cfg.delay?.minSeconds, dmax: cfg.delay?.maxSeconds, bsize: cfg.batch?.size, brest: cfg.batch?.restMinutes };
+  let match = "";
+  for (const [k, p] of Object.entries(PRESETS))
+    if (p.dmin === cur.dmin && p.dmax === cur.dmax && p.bsize === cur.bsize && p.brest === cur.brest) match = k;
+  document.querySelectorAll("#presets button").forEach((b) => b.classList.toggle("active", b.dataset.preset === match));
 }
 
 function populateTimezones() {
@@ -660,6 +669,48 @@ $("histForm").onsubmit = async (e) => {
     }).join("");
   } catch (err) { toast(err.message, true); }
 };
+
+// ---------- smart send options + presets ----------
+const PRESETS = {
+  safe:     { dmin: 40, dmax: 90, bsize: 30, brest: 15, warmup: true,  trickle: false, check: true },
+  balanced: { dmin: 25, dmax: 70, bsize: 40, brest: 12, warmup: false, trickle: false, check: true },
+  fast:     { dmin: 12, dmax: 30, bsize: 80, brest: 5,  warmup: false, trickle: false, check: true },
+};
+function loadSendOpts() {
+  if (!cfg.delay) return;
+  $("s_dmin").value = cfg.delay.minSeconds; $("s_dmax").value = cfg.delay.maxSeconds;
+  $("s_bsize").value = cfg.batch?.size ?? 40; $("s_brest").value = cfg.batch?.restMinutes ?? 12;
+  $("s_window").checked = !!cfg.schedule?.window?.enabled;
+  $("s_warmup").checked = !!cfg.safety?.warmup?.enabled;
+  $("s_freq").checked = !!cfg.safety?.frequencyCap?.enabled;
+  $("s_trickle").checked = !!cfg.safety?.trickle?.enabled;
+  $("s_check").checked = cfg.safety?.checkRegistered !== false;
+}
+async function applySendOpts() {
+  cfg.delay = { ...cfg.delay, minSeconds: +$("s_dmin").value, maxSeconds: +$("s_dmax").value };
+  cfg.batch = { ...cfg.batch, size: +$("s_bsize").value, restMinutes: +$("s_brest").value };
+  cfg.schedule = { ...cfg.schedule, window: { ...cfg.schedule?.window, enabled: $("s_window").checked } };
+  cfg.safety = { ...cfg.safety,
+    checkRegistered: $("s_check").checked,
+    warmup: { ...cfg.safety?.warmup, enabled: $("s_warmup").checked },
+    frequencyCap: { ...cfg.safety?.frequencyCap, enabled: $("s_freq").checked },
+    trickle: { ...cfg.safety?.trickle, enabled: $("s_trickle").checked } };
+  try {
+    await api("/api/config", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(cfg) });
+    flashSaved("s_saved"); loadConfig(); loadEta(+$("etaCount").value || 0);
+  } catch (e) { toast(e.message, true); }
+}
+$("s_apply").onclick = applySendOpts;
+$("s_advanced").onclick = (e) => { e.preventDefault(); document.querySelector('.tab[data-tab="settings"]').click(); };
+$("presets").querySelectorAll("button").forEach((b) => b.onclick = () => {
+  const p = PRESETS[b.dataset.preset];
+  $("s_dmin").value = p.dmin; $("s_dmax").value = p.dmax; $("s_bsize").value = p.bsize; $("s_brest").value = p.brest;
+  $("s_warmup").checked = p.warmup; $("s_trickle").checked = p.trickle; $("s_check").checked = p.check;
+  $("presets").querySelectorAll("button").forEach((x) => x.classList.remove("active"));
+  b.classList.add("active");
+  if (b.dataset.preset === "fast" && !confirm("Fast pacing raises ban risk — only use it on a warmed-up number with an opt-in list. Apply?")) return;
+  applySendOpts();
+});
 
 // ---------- send-time estimator ----------
 async function loadEta(count) {

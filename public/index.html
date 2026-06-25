@@ -225,6 +225,35 @@
         <span class="muted" id="sendListInfo"></span>
       </div>
 
+      <div class="send-opts">
+        <div class="send-opts-head">
+          <span class="eta-label">Sending speed</span>
+          <div class="presets" id="presets">
+            <button data-preset="safe" title="Slowest, safest — best for a new number">🛡️ Safe</button>
+            <button data-preset="balanced" title="Sensible default">⚖️ Balanced</button>
+            <button data-preset="fast" title="Faster — only for a warmed-up number + opt-in list">⚡ Fast</button>
+          </div>
+        </div>
+        <div class="send-knobs">
+          <label>Gap min (s) <input type="number" id="s_dmin" min="1" /></label>
+          <label>Gap max (s) <input type="number" id="s_dmax" min="1" /></label>
+          <label>Batch size <input type="number" id="s_bsize" min="0" /></label>
+          <label>Batch rest (min) <input type="number" id="s_brest" min="0" /></label>
+        </div>
+        <div class="send-toggles">
+          <label class="check"><input type="checkbox" id="s_window" /> Sending window</label>
+          <label class="check"><input type="checkbox" id="s_warmup" /> Warmup ramp</label>
+          <label class="check"><input type="checkbox" id="s_freq" /> Frequency cap</label>
+          <label class="check"><input type="checkbox" id="s_trickle" /> Trickle</label>
+          <label class="check"><input type="checkbox" id="s_check" /> Skip non-WhatsApp</label>
+        </div>
+        <div class="btnrow" style="margin-bottom:0">
+          <button class="btn" id="s_apply">Apply</button>
+          <span class="saved" id="s_saved"></span>
+          <a href="#" id="s_advanced" class="muted" style="margin-left:auto">All settings →</a>
+        </div>
+      </div>
+
       <div class="eta">
         <div class="eta-main">
           <span class="eta-label">Estimated time</span>
