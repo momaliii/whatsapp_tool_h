@@ -213,7 +213,8 @@ textarea { resize: vertical; font-family: ui-monospace, SFMono-Regular, Menlo, m
 
 .chart-box { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
 .chart-box h3 { margin-top: 0; }
-.chart-box svg { width: 100%; height: auto; display: block; }
+.chart-box svg:not(.i):not(.ti) { width: 100%; height: auto; display: block; }
+.chart-box .i, .chart-box .ti, .btn .i, .btn .ti { width: 15px; height: 15px; flex: none; }
 .legend { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 10px; font-size: 12px; color: var(--muted); }
 .legend .sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 4px; vertical-align: middle; }
 .sw.ok { background: var(--green); } .sw.bad { background: var(--red); } .sw.warn { background: var(--yellow); } .sw.bot { background: var(--blue); }

@@ -7,8 +7,8 @@
     "{hi|hey|hello}\n{{random:1000-9999}}\n{{random}}"
   ],
   "media": {
-    "enabled": false,
-    "path": "./media/sample.jpg",
+    "enabled": true,
+    "path": "media/4a84fa3beed11d1df1b91af7e9c90b4d.png",
     "_help": "Set enabled=true and point path to an image, video, pdf, or any file. If it's an image/video the 'message' above becomes its caption. Documents are sent as a file with the message as a separate text (see sendCaptionAsSeparateText)."
   },
   "sendCaptionAsSeparateText": false,
