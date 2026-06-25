@@ -14,6 +14,7 @@ import { computeInsights, estimateDuration, contactHistory, suggestSettings, non
 import { loadSequences, saveSequences, enroll, stats as dripStats } from "./src/drip.js";
 import { createLink, findLink, logClick, linksWithStats } from "./src/links.js";
 import { loadTemplates, saveTemplate, getTemplate, deleteTemplate } from "./src/templates.js";
+import { listMeta, saveList, getList, deleteList } from "./src/lists.js";
 import {
   requireAuth,
   authEnabled,
@@ -180,6 +181,25 @@ app.post("/api/preview", (req, res) => {
     res.json({ rendered });
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
+
+// ---------- saved contact lists ----------
+app.get("/api/lists", (_req, res) => res.json({ lists: listMeta() }));
+app.post("/api/lists", (req, res) => {
+  try {
+    const csv = fs.readFileSync(dataPath("contacts.csv"), "utf8");
+    if (!/(^|\n)\s*number/i.test(csv)) throw new Error('Current contacts need a "number" column to save');
+    res.json(saveList(req.body.name, csv));
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+app.post("/api/lists/apply", (req, res) => {
+  try {
+    const l = getList(req.body.id);
+    if (!l) return res.status(404).json({ error: "List not found" });
+    fs.writeFileSync(dataPath("contacts.csv"), l.csv.trim() + "\n");
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+app.post("/api/lists/delete", (req, res) => { deleteList(req.body.id); res.json({ ok: true }); });
 
 // ---------- contacts (raw CSV text) ----------
 app.get("/api/contacts", (_req, res) => {

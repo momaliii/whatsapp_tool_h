@@ -385,3 +385,6 @@ h2 { display: flex; align-items: center; gap: 10px; }
 /* approval banner */
 .approval { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
   background: #fffbeb; border: 1px solid rgba(217,119,6,.3); color: #92400e; border-radius: 10px; padding: 12px 16px; margin-bottom: 14px; font-size: 14px; }
+
+/* small inline divider in button rows */
+.btnrow .divider { width: 1px; height: 22px; background: var(--line); margin: 0 2px; }

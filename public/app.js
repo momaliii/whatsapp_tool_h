@@ -186,6 +186,36 @@ async function loadAudience(url, label) {
     toast(`Loaded ${r.count} ${label} — review, then Save`);
   } catch (e) { toast(e.message, true); }
 }
+// ---------- saved contact lists ----------
+async function loadLists() {
+  try {
+    const d = await api("/api/lists");
+    $("listSelect").innerHTML = '<option value="">Saved lists…</option>' +
+      d.lists.map((l) => `<option value="${l.id}">${escapeHtml(l.name)} (${l.count})</option>`).join("");
+    $("btnDeleteList").hidden = true;
+  } catch {}
+}
+$("btnSaveList").onclick = async () => {
+  const name = prompt("Save current contacts as list — name:", "My list");
+  if (!name) return;
+  await $("btnSaveContacts").onclick(); // persist current textarea first
+  try { await api("/api/lists", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }) }); toast("List saved"); loadLists(); }
+  catch (e) { toast(e.message, true); }
+};
+$("listSelect").onchange = async (e) => {
+  const id = e.target.value;
+  $("btnDeleteList").hidden = !id;
+  if (!id) return;
+  if (!confirm("Load this list into contacts? (replaces the current contacts)")) { e.target.value = ""; $("btnDeleteList").hidden = true; return; }
+  try { await api("/api/lists/apply", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) }); await loadContacts(); toast("List loaded"); }
+  catch (err) { toast(err.message, true); }
+};
+$("btnDeleteList").onclick = async () => {
+  const id = $("listSelect").value; if (!id) return;
+  if (!confirm("Delete this saved list? (your current contacts are not affected)")) return;
+  try { await api("/api/lists/delete", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) }); toast("List deleted"); loadLists(); }
+  catch (e) { toast(e.message, true); }
+};
 $("btnNonRepliers").onclick = () => loadAudience("/api/non-repliers", "non-repliers");
 $("btnEngaged").onclick = () => loadAudience("/api/engaged", "engaged contacts");
 $("btnFailed").onclick = () => loadAudience("/api/failed", "failed contacts");
@@ -919,5 +949,6 @@ async function initAuthUI() {
     loadEta();
     loadDrip();
     loadTemplates();
+    loadLists();
   } catch (e) { toast("Load error: " + e.message, true); }
 })();
