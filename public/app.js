@@ -403,9 +403,9 @@ function renderTimeline(timeline) {
       bars += `<rect class="bar-track" x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" fill="${col}" rx="1"><title>${d.date} — ${key}: ${v}</title></rect>`;
     }
     if (i % 2 === 0 || i === timeline.length - 1)
-      bars += `<text x="${(x + bw / 2).toFixed(1)}" y="${H - 7}" fill="#8b949e" font-size="9" text-anchor="middle">${d.date.slice(5)}</text>`;
+      bars += `<text x="${(x + bw / 2).toFixed(1)}" y="${H - 7}" fill="#6b7280" font-size="9" text-anchor="middle">${d.date.slice(5)}</text>`;
   });
-  const axis = `<text x="2" y="${padT + 8}" fill="#8b949e" font-size="9">${max}</text><line x1="${padL}" y1="${H - padB}" x2="${W}" y2="${H - padB}" stroke="#2a3340"/>`;
+  const axis = `<text x="2" y="${padT + 8}" fill="#6b7280" font-size="9">${max}</text><line x1="${padL}" y1="${H - padB}" x2="${W}" y2="${H - padB}" stroke="#e7e9ee"/>`;
   $("chartTimeline").innerHTML = `<svg viewBox="0 0 ${W} ${H}">${axis}${bars}</svg>`;
 }
 function renderDonut(status) {
@@ -421,7 +421,7 @@ function renderDonut(status) {
     off += len;
   }
   const legend = data.map((d) => `<div style="display:flex;align-items:center;gap:6px;font-size:13px;margin:4px 0"><span style="width:10px;height:10px;border-radius:50%;background:${d.c};display:inline-block"></span>${d.k}: <b>${d.v}</b> <span class="muted">(${Math.round(d.v / total * 100)}%)</span></div>`).join("");
-  $("chartDonut").innerHTML = `<svg viewBox="0 0 180 180" style="max-width:200px;margin:0 auto">${arcs}<text x="90" y="86" text-anchor="middle" fill="#e6edf3" font-size="22" font-weight="700">${total}</text><text x="90" y="104" text-anchor="middle" fill="#8b949e" font-size="10">messages</text></svg><div style="margin-top:10px">${legend}</div>`;
+  $("chartDonut").innerHTML = `<svg viewBox="0 0 180 180" style="max-width:200px;margin:0 auto">${arcs}<text x="90" y="86" text-anchor="middle" fill="#1a1d22" font-size="22" font-weight="700">${total}</text><text x="90" y="104" text-anchor="middle" fill="#6b7280" font-size="10">messages</text></svg><div style="margin-top:10px">${legend}</div>`;
 }
 function renderTriggers(top) {
   if (!top || !top.length) { $("insTriggers").innerHTML = '<p class="muted">No bot activity yet.</p>'; return; }
