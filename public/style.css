@@ -68,7 +68,8 @@ body {
 .tab:hover { color: var(--text); background: var(--panel2); }
 .tab.active { color: var(--text); background: var(--panel2); box-shadow: inset 3px 0 0 var(--green); }
 
-main { flex: 1; min-width: 0; max-width: 980px; margin: 0 auto; padding: 28px 28px 64px; }
+main { flex: 1; min-width: 0; padding: 28px 32px 64px; }
+main > .panel { max-width: 1060px; }
 .panel { display: none; animation: fade .22s ease; }
 .panel.active { display: block; }
 @keyframes fade { from { opacity: 0; transform: translateY(6px); } }
