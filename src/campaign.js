@@ -101,6 +101,14 @@ export async function runCampaign(client, opts = {}) {
     media = MessageMedia.fromFilePath(mediaFile);
   }
 
+  // ---- trickle mode: spread the queue evenly across N hours ----
+  let trickleAvg = 0;
+  if (cfg.safety?.trickle?.enabled && !dryRun && work.length > 1) {
+    const hrs = +cfg.safety.trickle.hours || 8;
+    trickleAvg = Math.max(2, Math.round((hrs * 3600) / work.length));
+    on.log("info", `🐢 Trickle: spreading ${work.length} message(s) over ~${hrs}h (~${trickleAvg}s apart).`);
+  }
+
   on.log(
     "info",
     `Starting: ${work.length} recipient(s) ${media ? "+ media" : "(text only)"}${
@@ -194,7 +202,9 @@ export async function runCampaign(client, opts = {}) {
           );
         }
       } else if (!dryRun) {
-        const wait = randInt(cfg.delay.minSeconds, cfg.delay.maxSeconds);
+        const wait = trickleAvg
+          ? randInt(Math.round(trickleAvg * 0.7), Math.round(trickleAvg * 1.3))
+          : randInt(cfg.delay.minSeconds, cfg.delay.maxSeconds);
         await countdown(wait, control, (s) =>
           on.progress({ index: i + 1, total: work.length, stats, name: "", phase: "waiting", wait: s })
         );

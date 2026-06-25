@@ -10,7 +10,7 @@ import { color, template } from "./src/utils.js";
 import { parse as parseCsv } from "csv-parse/sync";
 import { dataPath, MEDIA_DIR, ensureData } from "./src/paths.js";
 import { planReply, memStore } from "./src/bot.js";
-import { computeInsights, estimateDuration, contactHistory, suggestSettings, nonRepliers, engagedContacts, failedContacts, loadBlocklist, saveBlocklist } from "./src/analytics.js";
+import { computeInsights, estimateDuration, contactHistory, suggestSettings, nonRepliers, engagedContacts, failedContacts, loadBlocklist, saveBlocklist, logConversion } from "./src/analytics.js";
 import { loadSequences, saveSequences, enroll, stats as dripStats } from "./src/drip.js";
 import { createLink, findLink, logClick, linksWithStats } from "./src/links.js";
 import { loadTemplates, saveTemplate, getTemplate, deleteTemplate } from "./src/templates.js";
@@ -35,6 +35,14 @@ const app = express();
 app.set("trust proxy", true);
 app.use(express.json({ limit: "2mb" }));
 app.use(express.text({ type: "text/csv", limit: "5mb" }));
+
+// ---------- public conversion webhook (no login) — call from your thank-you page ----------
+app.all("/api/convert", (req, res) => {
+  const c = req.query.c || req.body?.c;
+  const v = req.query.v || req.body?.v;
+  logConversion(c, v);
+  res.json({ ok: true });
+});
 
 // ---------- public short-link redirect + click tracking (no login) ----------
 app.get("/l/:code", (req, res) => {
@@ -353,11 +361,17 @@ app.post("/api/bot/simulate", (req, res) => {
 app.post("/api/run", async (req, res) => {
   const dryRun = !!req.body?.dryRun;
   try {
-    // fire and forget; progress streams over SSE
+    // approval gate (real sends only)
+    if (!dryRun && readJson("config.json").approval?.enabled && !req.body?.approved) {
+      engine.requestApproval();
+      return res.json({ ok: true, pending: true });
+    }
     engine.run({ dryRun }).catch((e) => engine.log("error", e.message));
     res.json({ ok: true });
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
+app.post("/api/approve", (_req, res) => { engine.approve(); res.json({ ok: true }); });
+app.post("/api/discard-approval", (_req, res) => { engine.discardApproval(); res.json({ ok: true }); });
 
 app.post("/api/stop", (_req, res) => { engine.stop(); res.json({ ok: true }); });
 app.post("/api/pause", (_req, res) => { engine.pause(); res.json({ ok: true }); });

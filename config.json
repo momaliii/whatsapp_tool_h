@@ -75,12 +75,30 @@
       "step": 20,
       "maxPerDay": 500,
       "_help": "New-number warmup: cap total real messages per day, ramping up startPerDay + step×(days since first send), up to maxPerDay."
+    },
+    "trickle": {
+      "enabled": false,
+      "hours": 8,
+      "_help": "Trickle mode: ignore the fixed delay and instead spread the whole list evenly across this many hours (looks more human, lowers ban risk)."
     }
+  },
+  "approval": {
+    "enabled": false,
+    "_help": "When on, a real send must be approved first (Submit for approval → Approve & send). Prevents accidental big sends and supports a reviewer."
   },
   "optOut": {
     "enabled": true,
-    "keywords": ["stop", "unsubscribe", "الغاء", "إلغاء"],
-    "optInKeywords": ["start", "subscribe", "اشتراك"],
+    "keywords": [
+      "stop",
+      "unsubscribe",
+      "الغاء",
+      "إلغاء"
+    ],
+    "optInKeywords": [
+      "start",
+      "subscribe",
+      "اشتراك"
+    ],
     "reply": "You've been unsubscribed ✅. Reply START to opt back in.",
     "optInReply": "You're subscribed again 🙂",
     "_help": "When someone replies with an opt-out keyword they're added to the blocklist and excluded from all campaigns (honored even if the bot is off)."

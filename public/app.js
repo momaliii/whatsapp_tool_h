@@ -38,10 +38,21 @@ document.querySelectorAll(".tab").forEach((tab) => {
     h2.prepend(clone);
   }
 });
-// auto-add a disk icon to every "Save" button
-const SAVE_SVG = '<svg class="i" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg> ';
+// auto-add matching icons to common action buttons (skips ones with an icon/emoji already)
+const I = (p) => `<svg class="i" viewBox="0 0 24 24">${p}</svg> `;
+const BTN_ICONS = [
+  [/^Save\b/, I('<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z"/><path d="M17 21v-8H7v8M7 3v5h8"/>')],
+  [/^(Add|New|\+|Enroll)/, I('<path d="M5 12h14"/><path d="M12 5v14"/>')],
+  [/^Reset/, I('<path d="M3 12a9 9 0 1 0 9-9 9.7 9.7 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>')],
+  [/^Validate/, I('<path d="M20 6 9 17l-5-5"/>')],
+  [/^(Look up|Suggest|Estimate)/, I('<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>')],
+  [/^Connect WhatsApp|^Get started/, I('<path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/>')],
+];
 document.querySelectorAll(".btn").forEach((b) => {
-  if (!b.querySelector("svg") && /^Save\b/.test(b.textContent.trim())) b.insertAdjacentHTML("afterbegin", SAVE_SVG);
+  if (b.querySelector("svg")) return;
+  const t = b.textContent.trim();
+  if (/^[\p{Emoji}]/u.test(t)) return; // keep emoji-led buttons (flow palette etc.)
+  for (const [re, svg] of BTN_ICONS) if (re.test(t)) { b.insertAdjacentHTML("afterbegin", svg); break; }
 });
 
 // ---------- connection ----------
@@ -130,6 +141,7 @@ function applyState(s) {
   if (atBottom) log.scrollTop = log.scrollHeight;
 
   renderSchedule(s.scheduledAt);
+  renderApproval(s.pendingApproval);
 
   if (s.state === "ready" && wasRunning) { loadResults(); loadInsights(); }
   wasRunning = running;
@@ -349,7 +361,10 @@ async function loadConfig() {
   $("cfg_warmMax").value = cfg.safety?.warmup?.maxPerDay ?? 500;
   $("cfg_freq").checked = !!cfg.safety?.frequencyCap?.enabled;
   $("cfg_freqDays").value = cfg.safety?.frequencyCap?.days ?? 7;
+  $("cfg_trickle").checked = !!cfg.safety?.trickle?.enabled;
+  $("cfg_trickleHours").value = cfg.safety?.trickle?.hours ?? 8;
   $("cfg_optout").checked = cfg.optOut?.enabled !== false;
+  $("cfg_approval").checked = !!cfg.approval?.enabled;
   loadBlocklist();
   $("cfg_tz").value = cfg.vars?.timezone || "";
   $("cfg_locale").value = cfg.vars?.locale || "";
@@ -400,7 +415,9 @@ $("btnSaveSettings").onclick = async () => {
   cfg.publicUrl = $("cfg_publicUrl").value.trim().replace(/\/$/, "");
   cfg.safety.warmup = { ...cfg.safety?.warmup, enabled: $("cfg_warmup").checked, startPerDay: +$("cfg_warmStart").value, step: +$("cfg_warmStep").value, maxPerDay: +$("cfg_warmMax").value };
   cfg.safety.frequencyCap = { ...cfg.safety?.frequencyCap, enabled: $("cfg_freq").checked, days: +$("cfg_freqDays").value };
+  cfg.safety.trickle = { ...cfg.safety?.trickle, enabled: $("cfg_trickle").checked, hours: +$("cfg_trickleHours").value };
   cfg.optOut = { ...cfg.optOut, enabled: $("cfg_optout").checked };
+  cfg.approval = { ...cfg.approval, enabled: $("cfg_approval").checked };
   cfg.onlinePresence = $("cfg_online").checked;
   cfg.schedule = { ...cfg.schedule, window: { enabled: $("cfg_winEnabled").checked, start: $("cfg_winStart").value || "09:00", end: $("cfg_winEnd").value || "21:00" } };
   cfg.vars = { ...cfg.vars, timezone: $("cfg_tz").value, locale: $("cfg_locale").value.trim() };
@@ -434,6 +451,14 @@ $("btnDryRun").onclick = async () => {
   catch (e) { toast(e.message, true); }
 };
 $("btnStop").onclick = async () => { try { await api("/api/stop", { method: "POST" }); } catch (e) { toast(e.message, true); } };
+function renderApproval(p) {
+  const el = $("approvalBar");
+  if (!p) { el.innerHTML = ""; return; }
+  el.innerHTML = `<div class="approval"><span>📝 Campaign is <b>pending approval</b> (submitted ${new Date(p.at).toLocaleTimeString()}).</span>
+    <span><button class="btn primary" id="btnApprove">Approve &amp; send</button> <button class="btn ghost" id="btnDiscardAppr">Discard</button></span></div>`;
+  $("btnApprove").onclick = async () => { try { await api("/api/approve", { method: "POST" }); } catch (e) { toast(e.message, true); } };
+  $("btnDiscardAppr").onclick = async () => { try { await api("/api/discard-approval", { method: "POST" }); } catch (e) { toast(e.message, true); } };
+}
 $("btnPause").onclick = async () => {
   const paused = $("btnPause").dataset.paused === "1";
   try { await api(paused ? "/api/resume" : "/api/pause", { method: "POST" }); } catch (e) { toast(e.message, true); }
@@ -456,7 +481,7 @@ async function loadInsights() {
   try {
     const d = await api("/api/insights?days=" + insDays);
     renderHealth(d.health);
-    renderCards(d.totals);
+    renderCards(d.totals, d.conversions);
     renderTimeline(d.timeline);
     renderDonut(d.statusBreakdown);
     renderTriggers(d.bot.topTriggers);
@@ -466,7 +491,7 @@ async function loadInsights() {
     $("insStamp").textContent = "Updated " + new Date(d.generatedAt).toLocaleTimeString();
   } catch (e) { toast(e.message, true); }
 }
-function renderCards(t) {
+function renderCards(t, conv) {
   const cards = [
     { l: "Contacts", v: t.contacts, cls: "" },
     { l: "Messages sent", v: t.sent, cls: "ok" },
@@ -474,6 +499,7 @@ function renderCards(t) {
     { l: "Delivery rate", v: t.deliveryRate + "%", cls: t.deliveryRate >= 90 ? "ok" : t.deliveryRate >= 70 ? "warn" : "bad" },
     { l: "Bot replies", v: t.botReplies, cls: "blue" },
   ];
+  if (conv && conv.count) cards.push({ l: "Conversions", v: conv.count + (conv.value ? ` · ${conv.value.toLocaleString()}` : ""), cls: "ok" });
   $("insCards").innerHTML = cards.map((c) => `<div class="card ${c.cls}"><div class="v">${c.v}</div><div class="l">${c.l}</div></div>`).join("");
 }
 function renderTimeline(timeline) {

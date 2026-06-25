@@ -188,13 +188,16 @@
       <div class="checks">
         <label class="check"><input type="checkbox" id="cfg_warmup" /> Number warmup — ramp daily volume up gradually</label>
         <label class="check"><input type="checkbox" id="cfg_freq" /> Frequency cap — skip anyone messaged recently</label>
+        <label class="check"><input type="checkbox" id="cfg_trickle" /> Trickle mode — spread the whole list evenly over hours (most human)</label>
         <label class="check"><input type="checkbox" id="cfg_optout" /> Honour opt-out keywords (STOP / unsubscribe) automatically</label>
+        <label class="check"><input type="checkbox" id="cfg_approval" /> Require approval before a real send</label>
       </div>
       <div class="grid2">
         <label>Warmup start / day <input type="number" id="cfg_warmStart" /></label>
         <label>Warmup step / day <input type="number" id="cfg_warmStep" /></label>
         <label>Warmup max / day <input type="number" id="cfg_warmMax" /></label>
         <label>Frequency cap (days) <input type="number" id="cfg_freqDays" /></label>
+        <label>Trickle over (hours) <input type="number" id="cfg_trickleHours" /></label>
       </div>
 
       <h3>Blocklist <span class="muted">(opted-out / do-not-contact)</span></h3>
@@ -249,6 +252,8 @@
         <button class="btn danger" id="btnStop" disabled><svg class="i" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/></svg> Stop</button>
         <button class="btn ghost" id="btnClearResults">Reset history</button>
       </div>
+
+      <div id="approvalBar"></div>
 
       <div class="progress-wrap">
         <div class="progress"><div class="bar" id="bar"></div></div>
@@ -309,7 +314,8 @@
           <button class="btn" type="submit">Create</button>
         </form>
         <div id="linksList"></div>
-        <p class="hint">Put <code>{{track:CODE}}</code> in any message — it becomes a tracked link and logs who clicks. Set your <b>Public URL</b> in Settings first.</p>
+        <p class="hint">Put <code>{{track:CODE}}</code> in any message — it becomes a tracked link and logs who clicks. Set your <b>Public URL</b> in Settings first.<br>
+        <b>Conversions:</b> from your thank-you / order page call <code>&lt;Public URL&gt;/api/convert?c=&lt;number&gt;&amp;v=&lt;amount&gt;</code> to record a sale — it shows up as a Conversions card above.</p>
       </div>
       <div class="cols">
         <div class="chart-box">

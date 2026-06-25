@@ -277,6 +277,23 @@ export function contactHistory(query, countryCode) {
   return { number, name, count: items.length, items };
 }
 
+// ---------- conversions ----------
+export function logConversion(contact, value) {
+  try {
+    fs.appendFileSync(dataPath("conversions.jsonl"), JSON.stringify({ time: new Date().toISOString(), c: String(contact || "").replace(/\D/g, ""), value: +value || 0 }) + "\n");
+  } catch {}
+}
+export function conversionStats(sentCount) {
+  let count = 0, value = 0; const people = new Set();
+  try {
+    for (const l of fs.readFileSync(dataPath("conversions.jsonl"), "utf8").split("\n")) {
+      if (!l) continue;
+      try { const e = JSON.parse(l); count++; value += +e.value || 0; if (e.c) people.add(e.c); } catch {}
+    }
+  } catch {}
+  return { count, value: Math.round(value), people: people.size, rate: sentCount ? Math.round((people.size / sentCount) * 100) : 0 };
+}
+
 /** A 0–100 sender-health score from recent send outcomes. */
 export function senderHealth() {
   const results = readResults().slice(-300);
@@ -384,6 +401,7 @@ export function computeInsights({ days = 30 } = {}) {
     recent,
     heatmap: bestTimeHeatmap(tz),
     health: senderHealth(),
+    conversions: conversionStats(sent),
     generatedAt: new Date().toISOString(),
   };
 }

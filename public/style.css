@@ -380,3 +380,7 @@ h2 { display: flex; align-items: center; gap: 10px; }
 .health-score { font-size: 34px; font-weight: 800; line-height: 1; }
 .health-score small { font-size: 14px; color: var(--muted); font-weight: 500; }
 .health-meta { font-size: 13px; }
+
+/* approval banner */
+.approval { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  background: #fffbeb; border: 1px solid rgba(217,119,6,.3); color: #92400e; border-radius: 10px; padding: 12px 16px; margin-bottom: 14px; font-size: 14px; }

@@ -39,6 +39,7 @@ class Engine extends EventEmitter {
     this._wasDisconnected = false;
     this._campaignSends = []; // {id, t} for ban-detection
     this._ackById = new Map(); // msgId -> ack level
+    this.pendingApproval = null; // {at} when a send needs approval
     this.scheduledAt = null;
     try {
       const s = JSON.parse(fs.readFileSync(dataPath("schedule.json"), "utf8"));
@@ -62,7 +63,25 @@ class Engine extends EventEmitter {
       reconnecting: this._reconnecting,
       paused: !!this.control?.paused,
       receipts: this.receipts(),
+      pendingApproval: this.pendingApproval,
     };
+  }
+
+  requestApproval() {
+    this.pendingApproval = { at: new Date().toISOString() };
+    this.log("warn", "📝 Campaign submitted for approval — click Approve & send to proceed.");
+    this.emitUpdate();
+  }
+  approve() {
+    if (!this.pendingApproval) return;
+    this.pendingApproval = null;
+    this.log("info", "✅ Approved — starting send.");
+    this.run({ dryRun: false }).catch((e) => this.log("error", e.message));
+  }
+  discardApproval() {
+    this.pendingApproval = null;
+    this.log("info", "Approval request discarded.");
+    this.emitUpdate();
   }
 
   /** Live delivered/read counts for the running campaign (from ack tracking). */
