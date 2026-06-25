@@ -93,6 +93,32 @@ export function template(text, row = {}, opts = {}) {
       const ck = Object.keys(row).find((k) => k.toLowerCase() === lk);
       if (ck) return row[ck] == null ? "" : String(row[ck]);
     }
+    if (lk === "if") {
+      // {{if:VAR=VALUE?yes-text:no-text}} (also != and bare VAR for "exists")
+      const q = arg.indexOf("?");
+      if (q < 0) return "";
+      const cond = arg.slice(0, q), rest = arg.slice(q + 1);
+      const c = rest.indexOf(":");
+      const yes = c < 0 ? rest : rest.slice(0, c);
+      const no = c < 0 ? "" : rest.slice(c + 1);
+      const getv = (k) => {
+        const kk = k.trim();
+        if (kk in row) return row[kk];
+        const lk2 = kk.toLowerCase(); const ck = Object.keys(row).find((x) => x.toLowerCase() === lk2);
+        return ck ? row[ck] : undefined;
+      };
+      const ne = cond.match(/^(.+?)\s*!=\s*(.*)$/), eqm = cond.match(/^(.+?)\s*=\s*(.*)$/);
+      let pass;
+      if (ne) pass = String(getv(ne[1]) ?? "").toLowerCase().trim() !== ne[2].toLowerCase().trim();
+      else if (eqm) pass = String(getv(eqm[1]) ?? "").toLowerCase().trim() === eqm[2].toLowerCase().trim();
+      else pass = String(getv(cond) ?? "").trim().length > 0;
+      return template(pass ? yes : no, row, opts); // resolve nested vars in the chosen branch
+    }
+    if (lk === "daysleft" || lk === "countdown") {
+      const t = Date.parse((arg || "").trim());
+      if (isNaN(t)) return "";
+      return String(Math.max(0, Math.ceil((t - now.getTime()) / 86400000)));
+    }
     if (lk === "track") {
       // {{track:CODE}} → tracked short link with the contact appended for click attribution
       const base = String(opts.publicUrl || "").replace(/\/$/, "");

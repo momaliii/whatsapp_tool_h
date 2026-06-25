@@ -63,7 +63,27 @@
       "minDeliveredPct": 25,
       "graceSeconds": 90,
       "_help": "Ban guardrail: if fewer than minDeliveredPct of the last sampleSize messages get a delivered receipt within graceSeconds, auto-pause the campaign (your number may be throttled/blocked)."
+    },
+    "frequencyCap": {
+      "enabled": false,
+      "days": 7,
+      "_help": "Never message the same contact more than once within this many days (across all campaigns)."
+    },
+    "warmup": {
+      "enabled": false,
+      "startPerDay": 20,
+      "step": 20,
+      "maxPerDay": 500,
+      "_help": "New-number warmup: cap total real messages per day, ramping up startPerDay + step×(days since first send), up to maxPerDay."
     }
+  },
+  "optOut": {
+    "enabled": true,
+    "keywords": ["stop", "unsubscribe", "الغاء", "إلغاء"],
+    "optInKeywords": ["start", "subscribe", "اشتراك"],
+    "reply": "You've been unsubscribed ✅. Reply START to opt back in.",
+    "optInReply": "You're subscribed again 🙂",
+    "_help": "When someone replies with an opt-out keyword they're added to the blocklist and excluded from all campaigns (honored even if the bot is off)."
   },
   "alerts": {
     "enabled": false,

@@ -69,7 +69,9 @@
       <div class="btnrow">
         <label class="btn">Import CSV<input type="file" id="csvFile" accept=".csv" hidden /></label>
         <button class="btn" id="btnValidate">Validate numbers</button>
-        <button class="btn" id="btnNonRepliers" title="Load contacts you messaged who never replied">↻ Non-repliers</button>
+        <button class="btn" id="btnNonRepliers" title="Contacts you messaged who never replied">Non-repliers</button>
+        <button class="btn" id="btnEngaged" title="Contacts who replied or clicked a link">Engaged</button>
+        <button class="btn" id="btnFailed" title="Contacts whose last send failed">Retry failed</button>
         <span class="muted" id="contactCount"></span>
       </div>
       <textarea id="contactsArea" spellcheck="false" rows="14" placeholder="number,name&#10;201001234567,Ahmed"></textarea>
@@ -97,6 +99,9 @@
         <button class="chip" data-ins="{{month}}">month</button>
         <button class="chip" data-ins="{{random}}">random #</button>
         <button class="chip" data-ins="{{random:1000-9999}}">random 1000-9999</button>
+        <button class="chip" data-ins="{{if:city=Cairo?A:B}}">if/else</button>
+        <button class="chip" data-ins="{{daysleft:2026-07-01}}">days left</button>
+        <button class="chip" data-ins="{{track:CODE}}">tracked link</button>
         <button class="chip" data-ins="{hi|hey|hello}">{a|b|c} choice</button>
       </div>
       <p class="hint">Use any column from your CSV too, e.g. <code>{{city}}</code>. Built-ins are filled in per message — random &amp; spintax pick fresh each send.</p>
@@ -172,6 +177,25 @@
         <label>Alert number (international) <input id="cfg_alertNumber" placeholder="2010xxxxxxxx" /></label>
         <label>Public URL (for tracked links) <input id="cfg_publicUrl" placeholder="https://...railway.app" /></label>
       </div>
+
+      <h3>Deliverability</h3>
+      <p class="muted">Protect your number: ramp a new number up slowly, don't over-message people, and honour opt-outs.</p>
+      <div class="checks">
+        <label class="check"><input type="checkbox" id="cfg_warmup" /> Number warmup — ramp daily volume up gradually</label>
+        <label class="check"><input type="checkbox" id="cfg_freq" /> Frequency cap — skip anyone messaged recently</label>
+        <label class="check"><input type="checkbox" id="cfg_optout" /> Honour opt-out keywords (STOP / unsubscribe) automatically</label>
+      </div>
+      <div class="grid2">
+        <label>Warmup start / day <input type="number" id="cfg_warmStart" /></label>
+        <label>Warmup step / day <input type="number" id="cfg_warmStep" /></label>
+        <label>Warmup max / day <input type="number" id="cfg_warmMax" /></label>
+        <label>Frequency cap (days) <input type="number" id="cfg_freqDays" /></label>
+      </div>
+
+      <h3>Blocklist <span class="muted">(opted-out / do-not-contact)</span></h3>
+      <p class="muted">One number per line. People who reply STOP are added here automatically and excluded from every campaign.</p>
+      <textarea id="blocklistArea" rows="5" spellcheck="false" placeholder="201001234567"></textarea>
+      <div class="btnrow"><button class="btn" id="btnSaveBlocklist">Save blocklist</button> <span class="muted" id="blockCount"></span></div>
 
       <div class="btnrow">
         <button class="btn primary" id="btnSaveSettings">Save settings</button>

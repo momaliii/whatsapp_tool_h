@@ -45,6 +45,82 @@ export function lastInboundByNumber() {
   return m;
 }
 
+// ---------- deliverability & targeting ----------
+const BLOCK_FILE = "blocklist.json";
+
+export function loadBlocklist() {
+  try { return new Set((JSON.parse(fs.readFileSync(dataPath(BLOCK_FILE), "utf8")).numbers || []).map(String)); } catch { return new Set(); }
+}
+export function saveBlocklist(numbers) {
+  const clean = [...new Set((numbers || []).map((n) => String(n).replace(/\D/g, "")).filter(Boolean))];
+  fs.writeFileSync(dataPath(BLOCK_FILE), JSON.stringify({ numbers: clean }, null, 2));
+  return clean;
+}
+export function addToBlocklist(number) {
+  const n = String(number).replace(/\D/g, ""); if (!n) return;
+  const set = loadBlocklist(); if (set.has(n)) return;
+  set.add(n); saveBlocklist([...set]);
+}
+export function removeFromBlocklist(number) {
+  const n = String(number).replace(/\D/g, ""); if (!n) return;
+  const set = loadBlocklist(); if (!set.has(n)) return;
+  set.delete(n); saveBlocklist([...set]);
+}
+
+/** Numbers we sent to within the last `days` (for frequency cap). */
+export function recentlyMessaged(days) {
+  const cutoff = Date.now() - days * 86400000;
+  const set = new Set();
+  for (const r of readResults()) {
+    if (r.status !== "sent" || !r.number) continue;
+    const t = Date.parse(r.timestamp);
+    if (!isNaN(t) && t >= cutoff) set.add(r.number);
+  }
+  return set;
+}
+
+/** How many real messages are still allowed today under warmup ramp. */
+export function warmupRemaining(cfg) {
+  const w = cfg.safety?.warmup || {};
+  if (!w.enabled) return Infinity;
+  const results = readResults().filter((r) => r.status === "sent");
+  let first = Infinity, today = 0;
+  const dayStart = new Date(); dayStart.setHours(0, 0, 0, 0);
+  for (const r of results) {
+    const t = Date.parse(r.timestamp); if (isNaN(t)) continue;
+    first = Math.min(first, t);
+    if (t >= dayStart.getTime()) today++;
+  }
+  const dayN = first === Infinity ? 0 : Math.floor((Date.now() - first) / 86400000);
+  const cap = Math.min(+w.maxPerDay || 1000, (+w.startPerDay || 20) + (+w.step || 20) * dayN);
+  return Math.max(0, cap - today);
+}
+
+function readClicks() {
+  try {
+    return fs.readFileSync(dataPath("clicks.jsonl"), "utf8").split("\n").filter(Boolean)
+      .map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean);
+  } catch { return []; }
+}
+
+/** Contacts who engaged: replied to us OR clicked a tracked link. */
+export function engagedContacts() {
+  const engaged = new Set([...readInbound()]);
+  for (const c of readClicks()) if (c.c) engaged.add(String(c.c));
+  const names = new Map();
+  for (const r of readResults()) if (r.number && r.name) names.set(r.number, r.name);
+  return { count: engaged.size, contacts: [...engaged].map((number) => ({ number, name: names.get(number) || "" })) };
+}
+
+/** Contacts whose last result was 'failed' (for retry-failed). */
+export function failedContacts() {
+  const last = new Map();
+  for (const r of readResults()) if (r.number) last.set(r.number, r);
+  const out = [];
+  for (const [number, r] of last) if (r.status === "failed") out.push({ number, name: r.name || "" });
+  return { count: out.length, contacts: out };
+}
+
 /** Contacts we messaged ('sent') who never replied to us. */
 export function nonRepliers() {
   const sent = new Map();

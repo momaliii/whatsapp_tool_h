@@ -143,15 +143,18 @@ $("btnSaveContacts").onclick = async () => {
     flashSaved("contactsSaved"); countContacts();
   } catch (e) { toast(e.message, true); }
 };
-$("btnNonRepliers").onclick = async () => {
+async function loadAudience(url, label) {
   try {
-    const r = await api("/api/non-repliers");
-    if (!r.count) return toast("No non-repliers yet (need past sends + replies tracked).");
+    const r = await api(url);
+    if (!r.count) return toast(`No ${label} yet.`);
     const csv = "number,name\n" + r.contacts.map((c) => `${c.number},${(c.name || "").replace(/,/g, " ")}`).join("\n");
     $("contactsArea").value = csv; countContacts();
-    toast(`Loaded ${r.count} non-repliers (of ${r.messaged} messaged) — review, then Save`);
+    toast(`Loaded ${r.count} ${label} — review, then Save`);
   } catch (e) { toast(e.message, true); }
-};
+}
+$("btnNonRepliers").onclick = () => loadAudience("/api/non-repliers", "non-repliers");
+$("btnEngaged").onclick = () => loadAudience("/api/engaged", "engaged contacts");
+$("btnFailed").onclick = () => loadAudience("/api/failed", "failed contacts");
 $("btnValidate").onclick = async () => {
   // save first so server validates current text
   try { await api("/api/contacts", { method: "POST", headers: { "Content-Type": "text/csv" }, body: $("contactsArea").value }); } catch (e) { return toast(e.message, true); }
@@ -297,6 +300,14 @@ async function loadConfig() {
   $("cfg_alerts").checked = !!cfg.alerts?.enabled;
   $("cfg_alertNumber").value = cfg.alerts?.number || "";
   $("cfg_publicUrl").value = cfg.publicUrl || "";
+  $("cfg_warmup").checked = !!cfg.safety?.warmup?.enabled;
+  $("cfg_warmStart").value = cfg.safety?.warmup?.startPerDay ?? 20;
+  $("cfg_warmStep").value = cfg.safety?.warmup?.step ?? 20;
+  $("cfg_warmMax").value = cfg.safety?.warmup?.maxPerDay ?? 500;
+  $("cfg_freq").checked = !!cfg.safety?.frequencyCap?.enabled;
+  $("cfg_freqDays").value = cfg.safety?.frequencyCap?.days ?? 7;
+  $("cfg_optout").checked = cfg.optOut?.enabled !== false;
+  loadBlocklist();
   $("cfg_tz").value = cfg.vars?.timezone || "";
   $("cfg_locale").value = cfg.vars?.locale || "";
   updateTzClock();
@@ -322,6 +333,18 @@ $("btnTzBrowser").onclick = () => {
   try { $("cfg_tz").value = Intl.DateTimeFormat().resolvedOptions().timeZone; updateTzClock(); } catch {}
 };
 setInterval(updateTzClock, 1000);
+async function loadBlocklist() {
+  try {
+    const r = await api("/api/blocklist");
+    $("blocklistArea").value = (r.numbers || []).join("\n");
+    $("blockCount").textContent = `${(r.numbers || []).length} number(s)`;
+  } catch {}
+}
+$("btnSaveBlocklist").onclick = async () => {
+  const numbers = $("blocklistArea").value.split("\n").map((s) => s.trim()).filter(Boolean);
+  try { const r = await api("/api/blocklist", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ numbers }) }); $("blocklistArea").value = r.numbers.join("\n"); $("blockCount").textContent = `${r.numbers.length} number(s)`; toast("Blocklist saved"); }
+  catch (e) { toast(e.message, true); }
+};
 $("btnSaveSettings").onclick = async () => {
   cfg.countryCode = $("cfg_cc").value;
   cfg.delay = { ...cfg.delay, minSeconds: +$("cfg_dmin").value, maxSeconds: +$("cfg_dmax").value };
@@ -332,6 +355,9 @@ $("btnSaveSettings").onclick = async () => {
     banGuard: { ...cfg.safety?.banGuard, enabled: $("cfg_banGuard").checked } };
   cfg.alerts = { ...cfg.alerts, enabled: $("cfg_alerts").checked, number: $("cfg_alertNumber").value.trim() };
   cfg.publicUrl = $("cfg_publicUrl").value.trim().replace(/\/$/, "");
+  cfg.safety.warmup = { ...cfg.safety?.warmup, enabled: $("cfg_warmup").checked, startPerDay: +$("cfg_warmStart").value, step: +$("cfg_warmStep").value, maxPerDay: +$("cfg_warmMax").value };
+  cfg.safety.frequencyCap = { ...cfg.safety?.frequencyCap, enabled: $("cfg_freq").checked, days: +$("cfg_freqDays").value };
+  cfg.optOut = { ...cfg.optOut, enabled: $("cfg_optout").checked };
   cfg.onlinePresence = $("cfg_online").checked;
   cfg.schedule = { ...cfg.schedule, window: { enabled: $("cfg_winEnabled").checked, start: $("cfg_winStart").value || "09:00", end: $("cfg_winEnd").value || "21:00" } };
   cfg.vars = { ...cfg.vars, timezone: $("cfg_tz").value, locale: $("cfg_locale").value.trim() };

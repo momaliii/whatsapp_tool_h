@@ -10,7 +10,7 @@ import { color, template } from "./src/utils.js";
 import { parse as parseCsv } from "csv-parse/sync";
 import { dataPath, MEDIA_DIR, ensureData } from "./src/paths.js";
 import { planReply, memStore } from "./src/bot.js";
-import { computeInsights, estimateDuration, contactHistory, suggestSettings, nonRepliers } from "./src/analytics.js";
+import { computeInsights, estimateDuration, contactHistory, suggestSettings, nonRepliers, engagedContacts, failedContacts, loadBlocklist, saveBlocklist } from "./src/analytics.js";
 import { loadSequences, saveSequences, enroll, stats as dripStats } from "./src/drip.js";
 import { createLink, findLink, logClick, linksWithStats } from "./src/links.js";
 import {
@@ -263,6 +263,15 @@ app.post("/api/links", (req, res) => {
 // re-engage: contacts we messaged who never replied
 app.get("/api/non-repliers", (_req, res) => {
   try { res.json(nonRepliers()); }
+  catch (e) { res.status(500).json({ error: e.message }); }
+});
+app.get("/api/engaged", (_req, res) => { try { res.json(engagedContacts()); } catch (e) { res.status(500).json({ error: e.message }); } });
+app.get("/api/failed", (_req, res) => { try { res.json(failedContacts()); } catch (e) { res.status(500).json({ error: e.message }); } });
+
+// blocklist / opt-out list
+app.get("/api/blocklist", (_req, res) => res.json({ numbers: [...loadBlocklist()] }));
+app.post("/api/blocklist", (req, res) => {
+  try { res.json({ ok: true, numbers: saveBlocklist(req.body.numbers || []) }); }
   catch (e) { res.status(500).json({ error: e.message }); }
 });
 

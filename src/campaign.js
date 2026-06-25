@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import pkg from "whatsapp-web.js";
 import { dataPath } from "./paths.js";
+import { loadBlocklist, recentlyMessaged, warmupRemaining } from "./analytics.js";
 import {
   sleep,
   randInt,
@@ -45,8 +46,13 @@ export async function runCampaign(client, opts = {}) {
 
   // ---- resume: drop already-sent numbers ----
   const alreadySent = cfg.safety?.skipAlreadySent ? readSentNumbers() : new Set();
+  // ---- deliverability filters ----
+  const blocked = dryRun ? new Set() : loadBlocklist();
+  const freqDays = cfg.safety?.frequencyCap?.enabled ? +cfg.safety.frequencyCap.days || 7 : 0;
+  const recent = freqDays && !dryRun ? recentlyMessaged(freqDays) : new Set();
+  let skBlock = 0, skFreq = 0;
 
-  // ---- normalize, de-dupe, resume ----
+  // ---- normalize, de-dupe, resume, filter ----
   const seen = new Set();
   const queue = [];
   for (const row of contacts) {
@@ -59,10 +65,22 @@ export async function runCampaign(client, opts = {}) {
     if (seen.has(number)) continue;
     seen.add(number);
     if (alreadySent.has(number)) continue;
+    if (blocked.has(number)) { skBlock++; continue; }
+    if (recent.has(number)) { skFreq++; continue; }
     queue.push({ ...row, _number: number, _jid: jid });
   }
+  if (skBlock) on.log("info", `⛔ Skipped ${skBlock} blocklisted/opted-out contact(s).`);
+  if (skFreq) on.log("info", `⏳ Skipped ${skFreq} contact(s) messaged within ${freqDays} day(s) (frequency cap).`);
 
-  const cap = Number(cfg.safety?.maxPerRun || 0);
+  // ---- caps: per-run + warmup ramp ----
+  let cap = Number(cfg.safety?.maxPerRun || 0);
+  if (cfg.safety?.warmup?.enabled && !dryRun) {
+    const rem = warmupRemaining(cfg);
+    if (rem !== Infinity) {
+      on.log("info", `🌱 Warmup: ${rem} message(s) allowed today.`);
+      cap = cap > 0 ? Math.min(cap, rem) : rem;
+    }
+  }
   const work = cap > 0 ? queue.slice(0, cap) : queue;
 
   const stats = { sent: 0, failed: 0, skipped: 0, total: work.length };

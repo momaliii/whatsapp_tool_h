@@ -5,7 +5,7 @@ import { runCampaign } from "./campaign.js";
 import { AUTH_DIR, dataPath } from "./paths.js";
 import { loadJson, sleep, randInt, template } from "./utils.js";
 import { planReply, fileStore } from "./bot.js";
-import { appendBotEvent, appendInbound, lastInboundByNumber } from "./analytics.js";
+import { appendBotEvent, appendInbound, lastInboundByNumber, addToBlocklist, removeFromBlocklist } from "./analytics.js";
 import { dueList, markSent, cancel as cancelDrip } from "./drip.js";
 import { appendResult } from "./utils.js";
 import { withinWindow } from "./campaign.js";
@@ -416,6 +416,27 @@ class Engine extends EventEmitter {
 
     let config;
     try { config = loadJson("config.json"); } catch { this.log("error", "bot: cannot read config.json"); return; }
+
+    // global opt-out / opt-in — always honored, even when the bot is off
+    const opt = config.optOut || {};
+    if (opt.enabled !== false) {
+      const b = (msg.body || "").trim().toLowerCase();
+      const outKw = (opt.keywords || ["stop", "unsubscribe", "الغاء", "إلغاء"]).map((k) => k.toLowerCase());
+      const inKw = (opt.optInKeywords || ["start", "subscribe", "اشتراك"]).map((k) => k.toLowerCase());
+      if (outKw.includes(b) || inKw.includes(b)) {
+        const num = (await msg.getContact().catch(() => null))?.number || from.replace(/@(c\.us|lid|g\.us)$/, "");
+        if (outKw.includes(b)) {
+          addToBlocklist(num);
+          this.log("info", `⛔ ${who} opted out — added to blocklist.`);
+          if (this.client && opt.reply) this.client.sendMessage(from, opt.reply).catch(() => {});
+          return;
+        }
+        removeFromBlocklist(num);
+        this.log("info", `✅ ${who} opted back in.`);
+        if (this.client && opt.optInReply) this.client.sendMessage(from, opt.optInReply).catch(() => {});
+      }
+    }
+
     const bot = config.bot || {};
     if (!bot.enabled) { this.log("warn", "🤖 auto-reply is OFF — enable it on the Auto-reply tab and Save."); return; }
     if (from.endsWith("@g.us") && !bot.replyInGroups) { this.log("info", "↳ group chat — ignored (groups disabled)."); return; }
