@@ -38,6 +38,11 @@ document.querySelectorAll(".tab").forEach((tab) => {
     h2.prepend(clone);
   }
 });
+// auto-add a disk icon to every "Save" button
+const SAVE_SVG = '<svg class="i" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg> ';
+document.querySelectorAll(".btn").forEach((b) => {
+  if (!b.querySelector("svg") && /^Save\b/.test(b.textContent.trim())) b.insertAdjacentHTML("afterbegin", SAVE_SVG);
+});
 
 // ---------- connection ----------
 $("btnConnect").onclick = async () => {
@@ -286,6 +291,27 @@ $("mediaFile").onchange = async (e) => {
   } catch (err) { toast(err.message, true); }
 };
 $("btnClearMedia").onclick = () => { campaign.media = { enabled: false, path: "" }; updateMedia(); };
+async function loadTemplates() {
+  try {
+    const d = await api("/api/templates");
+    $("tplSelect").innerHTML = '<option value="">Templates…</option>' +
+      d.templates.map((t) => `<option value="${t.id}">${escapeHtml(t.name)}</option>`).join("");
+  } catch {}
+}
+$("btnSaveTpl").onclick = async () => {
+  const name = prompt("Template name:", "My template");
+  if (!name) return;
+  await $("btnSaveMessage").onclick(); // save current first
+  try { await api("/api/templates", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }) }); toast("Template saved"); loadTemplates(); }
+  catch (e) { toast(e.message, true); }
+};
+$("tplSelect").onchange = async (e) => {
+  const id = e.target.value; if (!id) return;
+  if (!confirm("Load this template into the message? (overwrites current message)")) { e.target.value = ""; return; }
+  try { await api("/api/templates/apply", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) }); await loadCampaign(); toast("Template loaded"); }
+  catch (err) { toast(err.message, true); }
+  e.target.value = "";
+};
 $("btnSaveMessage").onclick = async () => {
   campaign.message = $("messageArea").value.split(/^\s*---\s*$/m).map((s) => s.trim()).filter(Boolean);
   campaign.sendCaptionAsSeparateText = $("captionSeparate").checked;
@@ -383,8 +409,23 @@ $("btnSaveSettings").onclick = async () => {
 };
 
 // ---------- send ----------
+function spamWarnings(msgs) {
+  const w = [], text = msgs.join("\n");
+  const links = (text.match(/https?:\/\//g) || []).length;
+  if (links >= 3) w.push(`${links} links — too many links is a spam signal`);
+  const letters = text.replace(/[^a-zA-Z]/g, ""), caps = text.replace(/[^A-Z]/g, "").length;
+  if (letters.length > 25 && caps / letters.length > 0.6) w.push("Mostly UPPERCASE — looks shouty/spammy");
+  if (msgs.length < 2 && !/\{\{|\{[^}]*\|[^}]*\}/.test(text)) w.push("No variables or wording variants — every message is identical (easier to flag). Add {{name}} or a {a|b|c} / --- variant.");
+  if (text.length > 1200) w.push("Very long message");
+  return w;
+}
 $("btnStart").onclick = async () => {
-  if (!confirm("Start sending to your contact list now?")) return;
+  let warns = [];
+  try { const c = await api("/api/campaign"); warns = spamWarnings([].concat(c.message || [])); } catch {}
+  const msg = warns.length
+    ? "⚠️ Possible deliverability issues:\n\n• " + warns.join("\n• ") + "\n\nStart sending anyway?"
+    : "Start sending to your contact list now?";
+  if (!confirm(msg)) return;
   try { await api("/api/run", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ dryRun: false }) }); }
   catch (e) { toast(e.message, true); }
 };
@@ -414,6 +455,7 @@ let insDays = 30;
 async function loadInsights() {
   try {
     const d = await api("/api/insights?days=" + insDays);
+    renderHealth(d.health);
     renderCards(d.totals);
     renderTimeline(d.timeline);
     renderDonut(d.statusBreakdown);
@@ -489,6 +531,19 @@ function renderRecent(recent) {
     const detail = r.detail ? " · " + escapeHtml(String(r.detail).slice(0, 30)) : "";
     return `<div class="row"><span>${icon}</span><span class="tag ${r.status}">${r.status}</span><span class="who">${who}${detail}</span><span class="t">${ts}</span></div>`;
   }).join("");
+}
+function renderHealth(h) {
+  const el = $("healthBar");
+  if (!el) return;
+  if (!h) { el.innerHTML = ""; return; }
+  const color = { good: "var(--green)", watch: "var(--yellow)", risk: "var(--red)", new: "var(--muted)" }[h.status] || "var(--muted)";
+  const label = { good: "Healthy", watch: "Watch", risk: "At risk", new: "New number" }[h.status] || h.status;
+  el.innerHTML =
+    `<div class="health" style="border-left:4px solid ${color}">
+       <div class="health-score" style="color:${color}">${h.score}<small>/100</small></div>
+       <div class="health-meta"><div><b>Sender health: ${label}</b> · ${h.successPct}% delivered (${h.sent} sent, ${h.failed} failed)</div>
+       <div class="muted">${escapeHtml(h.note)}</div></div>
+     </div>`;
 }
 function renderHeatmap(h) {
   const el = $("heatmap");
@@ -837,5 +892,6 @@ async function initAuthUI() {
     loadInsights();
     loadEta();
     loadDrip();
+    loadTemplates();
   } catch (e) { toast("Load error: " + e.message, true); }
 })();

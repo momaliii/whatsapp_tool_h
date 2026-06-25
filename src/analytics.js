@@ -277,6 +277,26 @@ export function contactHistory(query, countryCode) {
   return { number, name, count: items.length, items };
 }
 
+/** A 0–100 sender-health score from recent send outcomes. */
+export function senderHealth() {
+  const results = readResults().slice(-300);
+  let sent = 0, failed = 0;
+  for (const r of results) { if (r.status === "sent") sent++; else if (r.status === "failed") failed++; }
+  const attempted = sent + failed;
+  const successPct = attempted ? Math.round((sent / attempted) * 100) : 100;
+  // recent failure streak (last 20)
+  const last20 = results.slice(-20);
+  const recentFails = last20.filter((r) => r.status === "failed").length;
+  let score = successPct - recentFails * 3;
+  score = Math.max(0, Math.min(100, score));
+  const status = attempted < 5 ? "new" : score >= 90 ? "good" : score >= 70 ? "watch" : "risk";
+  const note = status === "new" ? "Not enough data yet — warm up gradually."
+    : status === "good" ? "Healthy. Keep delays human and avoid sudden volume spikes."
+    : status === "watch" ? "Some failures lately — slow down and check your message/number."
+    : "High failure rate — pause, reduce volume, and review. Your number may be throttled.";
+  return { score, status, successPct, sent, failed, sampled: results.length, note };
+}
+
 /** When contacts reply — a day-of-week × hour heatmap (from inbound activity). */
 export function bestTimeHeatmap(timezone) {
   const grid = Array.from({ length: 7 }, () => new Array(24).fill(0));
@@ -363,6 +383,7 @@ export function computeInsights({ days = 30 } = {}) {
     bot: { total: events.length, byKind, topTriggers },
     recent,
     heatmap: bestTimeHeatmap(tz),
+    health: senderHealth(),
     generatedAt: new Date().toISOString(),
   };
 }

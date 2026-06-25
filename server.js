@@ -13,6 +13,7 @@ import { planReply, memStore } from "./src/bot.js";
 import { computeInsights, estimateDuration, contactHistory, suggestSettings, nonRepliers, engagedContacts, failedContacts, loadBlocklist, saveBlocklist } from "./src/analytics.js";
 import { loadSequences, saveSequences, enroll, stats as dripStats } from "./src/drip.js";
 import { createLink, findLink, logClick, linksWithStats } from "./src/links.js";
+import { loadTemplates, saveTemplate, getTemplate, deleteTemplate } from "./src/templates.js";
 import {
   requireAuth,
   authEnabled,
@@ -126,6 +127,24 @@ app.post("/api/config", (req, res) => {
   try { writeJson("config.json", req.body); res.json({ ok: true }); }
   catch (e) { res.status(500).json({ error: e.message }); }
 });
+
+// ---------- message templates ----------
+app.get("/api/templates", (_req, res) => res.json(loadTemplates()));
+app.post("/api/templates", (req, res) => {
+  try { res.json(saveTemplate(req.body.name, readJson("campaign.json"))); }
+  catch (e) { res.status(500).json({ error: e.message }); }
+});
+app.post("/api/templates/apply", (req, res) => {
+  try {
+    const t = getTemplate(req.body.id);
+    if (!t) return res.status(404).json({ error: "Template not found" });
+    const c = readJson("campaign.json");
+    c.message = t.message; c.media = t.media; c.sendCaptionAsSeparateText = t.sendCaptionAsSeparateText;
+    writeJson("campaign.json", c);
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+app.post("/api/templates/delete", (req, res) => { deleteTemplate(req.body.id); res.json({ ok: true }); });
 
 app.get("/api/campaign", (_req, res) => res.json(readJson("campaign.json")));
 app.post("/api/campaign", (req, res) => {
