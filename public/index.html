@@ -135,79 +135,83 @@
 
     <!-- SETTINGS -->
     <section class="panel" id="tab-settings">
-      <h2>Sending settings</h2>
-      <p class="muted">Defaults are deliberately slow &amp; safe. Faster = higher ban risk.</p>
-      <div class="grid2">
-        <label>Default country code <input type="number" id="cfg_cc" /></label>
-        <span></span>
-        <label>Delay min (sec) <input type="number" id="cfg_dmin" /></label>
-        <label>Delay max (sec) <input type="number" id="cfg_dmax" /></label>
-        <label>Batch size <input type="number" id="cfg_bsize" /></label>
-        <label>Batch rest (min) <input type="number" id="cfg_brest" /></label>
-        <label>Max per run (0 = no cap) <input type="number" id="cfg_cap" /></label>
-        <label>Typing speed (chars/sec) <input type="number" id="cfg_cps" /></label>
-      </div>
-      <div class="checks">
-        <label class="check"><input type="checkbox" id="cfg_typing" /> Show “typing…” indicator</label>
-        <label class="check"><input type="checkbox" id="cfg_check" /> Skip numbers not on WhatsApp</label>
-        <label class="check"><input type="checkbox" id="cfg_skip" /> Skip numbers already messaged (resume)</label>
-        <label class="check"><input type="checkbox" id="cfg_online" /> Stay “online” while sending</label>
+      <h2>Settings</h2>
+      <p class="muted">Advanced configuration. The common per-send controls (speed, batch, window on/off, warmup/frequency/trickle on/off) now live on the <b>Send</b> tab.</p>
+
+      <div class="settings-card">
+        <h3>Campaign basics</h3>
+        <div class="grid2">
+          <label>Default country code <input type="number" id="cfg_cc" /></label>
+          <label>Max per run (0 = no cap) <input type="number" id="cfg_cap" /></label>
+          <label>Typing speed (chars/sec) <input type="number" id="cfg_cps" /></label>
+          <span></span>
+        </div>
+        <div class="checks">
+          <label class="check"><input type="checkbox" id="cfg_typing" /> Show “typing…” indicator</label>
+          <label class="check"><input type="checkbox" id="cfg_skip" /> Skip numbers already messaged (resume)</label>
+          <label class="check"><input type="checkbox" id="cfg_online" /> Stay “online” while sending</label>
+        </div>
       </div>
 
-      <h3>Date &amp; time</h3>
-      <p class="muted">Controls the <code>{{date}}</code>/<code>{{time}}</code> variables and the sending window below. Set this to your timezone — important when hosted on a server (which is usually UTC).</p>
-      <div class="grid2">
-        <label>Timezone <select id="cfg_tz"></select></label>
-        <label>Locale (date format) <input id="cfg_locale" placeholder="e.g. en-US, ar-EG" /></label>
-      </div>
-      <div class="btnrow" style="margin-top:6px">
-        <button class="btn ghost" id="btnTzBrowser">Use my browser timezone</button>
-        <span class="muted" id="tzClock"></span>
-      </div>
-
-      <h3>Sending window</h3>
-      <p class="muted">Only send between these hours (in the timezone above). A long campaign pauses outside the window — so it never messages people in the middle of the night.</p>
-      <div class="checks">
-        <label class="check"><input type="checkbox" id="cfg_winEnabled" /> Limit sending to a daily window</label>
-      </div>
-      <div class="grid2">
-        <label>From <input type="time" id="cfg_winStart" /></label>
-        <label>To <input type="time" id="cfg_winEnd" /></label>
+      <div class="settings-card">
+        <h3>Date &amp; time</h3>
+        <p class="muted">Controls the <code>{{date}}</code>/<code>{{time}}</code> variables and the sending window. Set this to your timezone — important on a server (usually UTC).</p>
+        <div class="grid2">
+          <label>Timezone <select id="cfg_tz"></select></label>
+          <label>Locale (date format) <input id="cfg_locale" placeholder="e.g. en-US, ar-EG" /></label>
+        </div>
+        <div class="btnrow" style="margin:6px 0 0">
+          <button class="btn ghost" id="btnTzBrowser">Use my browser timezone</button>
+          <span class="muted" id="tzClock"></span>
+        </div>
       </div>
 
-      <h3>Reliability &amp; alerts</h3>
-      <p class="muted">Auto-reconnect if the session drops, auto-resume an interrupted campaign, and auto-pause if deliveries stall (possible block). Optionally get a WhatsApp alert.</p>
-      <div class="checks">
-        <label class="check"><input type="checkbox" id="cfg_autoResume" /> Auto-resume an interrupted campaign (crash-safe)</label>
-        <label class="check"><input type="checkbox" id="cfg_banGuard" /> Ban guardrail — auto-pause if deliveries stall</label>
-        <label class="check"><input type="checkbox" id="cfg_alerts" /> Send me a WhatsApp alert on disconnect / auto-pause</label>
-      </div>
-      <div class="grid2">
-        <label>Alert number (international) <input id="cfg_alertNumber" placeholder="2010xxxxxxxx" /></label>
-        <label>Public URL (for tracked links) <input id="cfg_publicUrl" placeholder="https://...railway.app" /></label>
+      <div class="settings-card">
+        <h3>Sending window hours</h3>
+        <p class="muted">When the window is switched on (Send tab), only send between these hours — so a long campaign never messages people in the middle of the night.</p>
+        <div class="grid2">
+          <label>From <input type="time" id="cfg_winStart" /></label>
+          <label>To <input type="time" id="cfg_winEnd" /></label>
+        </div>
       </div>
 
-      <h3>Deliverability</h3>
-      <p class="muted">Protect your number: ramp a new number up slowly, don't over-message people, and honour opt-outs.</p>
-      <div class="checks">
-        <label class="check"><input type="checkbox" id="cfg_warmup" /> Number warmup — ramp daily volume up gradually</label>
-        <label class="check"><input type="checkbox" id="cfg_freq" /> Frequency cap — skip anyone messaged recently</label>
-        <label class="check"><input type="checkbox" id="cfg_trickle" /> Trickle mode — spread the whole list evenly over hours (most human)</label>
-        <label class="check"><input type="checkbox" id="cfg_optout" /> Honour opt-out keywords (STOP / unsubscribe) automatically</label>
-        <label class="check"><input type="checkbox" id="cfg_approval" /> Require approval before a real send</label>
-      </div>
-      <div class="grid2">
-        <label>Warmup start / day <input type="number" id="cfg_warmStart" /></label>
-        <label>Warmup step / day <input type="number" id="cfg_warmStep" /></label>
-        <label>Warmup max / day <input type="number" id="cfg_warmMax" /></label>
-        <label>Frequency cap (days) <input type="number" id="cfg_freqDays" /></label>
-        <label>Trickle over (hours) <input type="number" id="cfg_trickleHours" /></label>
+      <div class="settings-card">
+        <h3>Deliverability tuning</h3>
+        <p class="muted">Warmup / frequency cap / trickle are switched on per-send on the Send tab — set their values here.</p>
+        <div class="grid2">
+          <label>Warmup start / day <input type="number" id="cfg_warmStart" /></label>
+          <label>Warmup step / day <input type="number" id="cfg_warmStep" /></label>
+          <label>Warmup max / day <input type="number" id="cfg_warmMax" /></label>
+          <label>Frequency cap (days) <input type="number" id="cfg_freqDays" /></label>
+          <label>Trickle over (hours) <input type="number" id="cfg_trickleHours" /></label>
+          <span></span>
+        </div>
+        <div class="checks">
+          <label class="check"><input type="checkbox" id="cfg_optout" /> Honour opt-out keywords (STOP / unsubscribe) automatically</label>
+          <label class="check"><input type="checkbox" id="cfg_approval" /> Require approval before a real send</label>
+        </div>
       </div>
 
-      <h3>Blocklist <span class="muted">(opted-out / do-not-contact)</span></h3>
-      <p class="muted">One number per line. People who reply STOP are added here automatically and excluded from every campaign.</p>
-      <textarea id="blocklistArea" rows="5" spellcheck="false" placeholder="201001234567"></textarea>
-      <div class="btnrow"><button class="btn" id="btnSaveBlocklist">Save blocklist</button> <span class="muted" id="blockCount"></span></div>
+      <div class="settings-card">
+        <h3>Reliability &amp; alerts</h3>
+        <p class="muted">Auto-reconnect, auto-resume an interrupted campaign, and auto-pause if deliveries stall — with an optional WhatsApp alert.</p>
+        <div class="checks">
+          <label class="check"><input type="checkbox" id="cfg_autoResume" /> Auto-resume an interrupted campaign (crash-safe)</label>
+          <label class="check"><input type="checkbox" id="cfg_banGuard" /> Ban guardrail — auto-pause if deliveries stall</label>
+          <label class="check"><input type="checkbox" id="cfg_alerts" /> Send me a WhatsApp alert on disconnect / auto-pause</label>
+        </div>
+        <div class="grid2">
+          <label>Alert number (international) <input id="cfg_alertNumber" placeholder="2010xxxxxxxx" /></label>
+          <label>Public URL (for tracked links) <input id="cfg_publicUrl" placeholder="https://...railway.app" /></label>
+        </div>
+      </div>
+
+      <div class="settings-card">
+        <h3>Blocklist <span class="muted">(opted-out / do-not-contact)</span></h3>
+        <p class="muted">One number per line. People who reply STOP are added here automatically and excluded from every campaign.</p>
+        <textarea id="blocklistArea" rows="5" spellcheck="false" placeholder="201001234567"></textarea>
+        <div class="btnrow" style="margin-bottom:0"><button class="btn" id="btnSaveBlocklist">Save blocklist</button> <span class="muted" id="blockCount"></span></div>
+      </div>
 
       <div class="btnrow">
         <button class="btn primary" id="btnSaveSettings">Save settings</button>

@@ -402,3 +402,8 @@ h2 { display: flex; align-items: center; gap: 10px; }
 .send-knobs label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); }
 .send-toggles { display: flex; flex-wrap: wrap; gap: 12px 18px; margin-bottom: 12px; }
 @media (max-width: 700px) { .send-knobs { grid-template-columns: 1fr 1fr; } }
+
+/* settings cards */
+.settings-card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px; margin-bottom: 16px; box-shadow: var(--shadow); }
+.settings-card h3 { margin-top: 0; }
+.settings-card .checks { margin-bottom: 0; }

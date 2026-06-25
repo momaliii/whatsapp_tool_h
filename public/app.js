@@ -378,18 +378,12 @@ let cfg = {};
 async function loadConfig() {
   cfg = await api("/api/config");
   $("cfg_cc").value = cfg.countryCode || "";
-  $("cfg_dmin").value = cfg.delay?.minSeconds ?? 25;
-  $("cfg_dmax").value = cfg.delay?.maxSeconds ?? 70;
-  $("cfg_bsize").value = cfg.batch?.size ?? 40;
-  $("cfg_brest").value = cfg.batch?.restMinutes ?? 12;
   $("cfg_cap").value = cfg.safety?.maxPerRun ?? 0;
   $("cfg_cps").value = cfg.typing?.charsPerSecond ?? 9;
   $("cfg_typing").checked = cfg.typing?.enabled ?? true;
-  $("cfg_check").checked = cfg.safety?.checkRegistered ?? true;
   $("cfg_skip").checked = cfg.safety?.skipAlreadySent ?? true;
   $("cfg_online").checked = cfg.onlinePresence ?? true;
   const w = cfg.schedule?.window || {};
-  $("cfg_winEnabled").checked = !!w.enabled;
   $("cfg_winStart").value = w.start || "09:00";
   $("cfg_winEnd").value = w.end || "21:00";
   $("cfg_autoResume").checked = cfg.safety?.autoResume !== false;
@@ -397,13 +391,10 @@ async function loadConfig() {
   $("cfg_alerts").checked = !!cfg.alerts?.enabled;
   $("cfg_alertNumber").value = cfg.alerts?.number || "";
   $("cfg_publicUrl").value = cfg.publicUrl || "";
-  $("cfg_warmup").checked = !!cfg.safety?.warmup?.enabled;
   $("cfg_warmStart").value = cfg.safety?.warmup?.startPerDay ?? 20;
   $("cfg_warmStep").value = cfg.safety?.warmup?.step ?? 20;
   $("cfg_warmMax").value = cfg.safety?.warmup?.maxPerDay ?? 500;
-  $("cfg_freq").checked = !!cfg.safety?.frequencyCap?.enabled;
   $("cfg_freqDays").value = cfg.safety?.frequencyCap?.days ?? 7;
-  $("cfg_trickle").checked = !!cfg.safety?.trickle?.enabled;
   $("cfg_trickleHours").value = cfg.safety?.trickle?.hours ?? 8;
   $("cfg_optout").checked = cfg.optOut?.enabled !== false;
   $("cfg_approval").checked = !!cfg.approval?.enabled;
@@ -456,21 +447,19 @@ $("btnSaveBlocklist").onclick = async () => {
 };
 $("btnSaveSettings").onclick = async () => {
   cfg.countryCode = $("cfg_cc").value;
-  cfg.delay = { ...cfg.delay, minSeconds: +$("cfg_dmin").value, maxSeconds: +$("cfg_dmax").value };
-  cfg.batch = { ...cfg.batch, size: +$("cfg_bsize").value, restMinutes: +$("cfg_brest").value };
   cfg.typing = { ...cfg.typing, enabled: $("cfg_typing").checked, charsPerSecond: +$("cfg_cps").value };
-  cfg.safety = { ...cfg.safety, maxPerRun: +$("cfg_cap").value, checkRegistered: $("cfg_check").checked, skipAlreadySent: $("cfg_skip").checked,
+  cfg.safety = { ...cfg.safety, maxPerRun: +$("cfg_cap").value, skipAlreadySent: $("cfg_skip").checked,
     autoResume: $("cfg_autoResume").checked,
     banGuard: { ...cfg.safety?.banGuard, enabled: $("cfg_banGuard").checked } };
   cfg.alerts = { ...cfg.alerts, enabled: $("cfg_alerts").checked, number: $("cfg_alertNumber").value.trim() };
   cfg.publicUrl = $("cfg_publicUrl").value.trim().replace(/\/$/, "");
-  cfg.safety.warmup = { ...cfg.safety?.warmup, enabled: $("cfg_warmup").checked, startPerDay: +$("cfg_warmStart").value, step: +$("cfg_warmStep").value, maxPerDay: +$("cfg_warmMax").value };
-  cfg.safety.frequencyCap = { ...cfg.safety?.frequencyCap, enabled: $("cfg_freq").checked, days: +$("cfg_freqDays").value };
-  cfg.safety.trickle = { ...cfg.safety?.trickle, enabled: $("cfg_trickle").checked, hours: +$("cfg_trickleHours").value };
+  cfg.safety.warmup = { ...cfg.safety?.warmup, startPerDay: +$("cfg_warmStart").value, step: +$("cfg_warmStep").value, maxPerDay: +$("cfg_warmMax").value };
+  cfg.safety.frequencyCap = { ...cfg.safety?.frequencyCap, days: +$("cfg_freqDays").value };
+  cfg.safety.trickle = { ...cfg.safety?.trickle, hours: +$("cfg_trickleHours").value };
   cfg.optOut = { ...cfg.optOut, enabled: $("cfg_optout").checked };
   cfg.approval = { ...cfg.approval, enabled: $("cfg_approval").checked };
   cfg.onlinePresence = $("cfg_online").checked;
-  cfg.schedule = { ...cfg.schedule, window: { enabled: $("cfg_winEnabled").checked, start: $("cfg_winStart").value || "09:00", end: $("cfg_winEnd").value || "21:00" } };
+  cfg.schedule = { ...cfg.schedule, window: { ...cfg.schedule?.window, start: $("cfg_winStart").value || "09:00", end: $("cfg_winEnd").value || "21:00" } };
   cfg.vars = { ...cfg.vars, timezone: $("cfg_tz").value, locale: $("cfg_locale").value.trim() };
   try { await api("/api/config", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(cfg) }); flashSaved("settingsSaved"); }
   catch (e) { toast(e.message, true); }
