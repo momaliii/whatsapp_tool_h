@@ -65,6 +65,7 @@ let running = false;
 function applyState(s) {
   // connection badge
   $("connDot").className = "dot " + (stateColors[s.state] || "");
+  $("statusPill").className = "status-pill " + (stateColors[s.state] || "");
   $("connText").textContent = s.state;
   $("stateLabel").textContent = s.state;
 
