@@ -509,7 +509,7 @@ class Engine extends EventEmitter {
     const bot = config.bot || {};
     if (!bot.enabled) { this.log("warn", "🤖 auto-reply is OFF — enable it on the Auto-reply tab and Save."); return; }
     if (from.endsWith("@g.us") && !bot.replyInGroups) { this.log("info", "↳ group chat — ignored (groups disabled)."); return; }
-    if (this._campaignActive) { this.log("info", "↳ ignored — a campaign is currently sending."); return; }
+    if (this._campaignActive && !bot.replyDuringCampaign) { this.log("info", "↳ ignored — a campaign is currently sending (enable “reply during campaigns” to allow)."); return; }
 
     // cooldown (skipped if the contact is mid-flow, so quick replies aren't lost)
     const inFlow = !!this.botStore.get(from);

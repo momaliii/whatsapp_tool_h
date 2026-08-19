@@ -786,6 +786,7 @@ async function loadBot() {
   $("botEnabled").checked = !!b.enabled;
   $("botCooldown").value = b.cooldownSeconds ?? 3;
   $("botGroups").checked = !!b.replyInGroups;
+  $("botDuringCampaign").checked = !!b.replyDuringCampaign;
   // rules
   const ar = await api("/api/autoreply");
   autoRules = (ar.rules || []).map((r) => {
@@ -854,7 +855,7 @@ $("btnAddRule").onclick = () => { autoRules.push({ keywords: "", match: "contain
 
 $("btnSaveAuto").onclick = async () => {
   // bot settings → config
-  cfg.bot = { ...(cfg.bot || {}), enabled: $("botEnabled").checked, cooldownSeconds: +$("botCooldown").value, replyInGroups: $("botGroups").checked };
+  cfg.bot = { ...(cfg.bot || {}), enabled: $("botEnabled").checked, cooldownSeconds: +$("botCooldown").value, replyInGroups: $("botGroups").checked, replyDuringCampaign: $("botDuringCampaign").checked };
   // rules → autoreply
   const rules = autoRules.map((r) => {
     const reply = [];
