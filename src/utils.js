@@ -49,9 +49,11 @@ export function builtinVars(now = new Date(), opts = {}) {
   const { locale, timezone } = opts;
   const fmt = (o) =>
     new Intl.DateTimeFormat(locale || undefined, { timeZone: timezone || undefined, ...o }).format(now);
+  // hour12:false renders midnight as "24" in some environments — normalize to 0
+  // so 00:00–00:59 counts as morning, not evening.
   const hour = Number(
     new Intl.DateTimeFormat("en-US", { timeZone: timezone || undefined, hour: "2-digit", hour12: false }).format(now)
-  );
+  ) % 24;
   // Arabic uses a simple two-way split at noon: صباح الخير / مساء الخير.
   const greetingAr = hour < 12 ? "صباح الخير" : "مساء الخير";
   const greetingEn = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
