@@ -52,7 +52,11 @@ export function builtinVars(now = new Date(), opts = {}) {
   const hour = Number(
     new Intl.DateTimeFormat("en-US", { timeZone: timezone || undefined, hour: "2-digit", hour12: false }).format(now)
   );
-  const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+  // Arabic uses a simple two-way split at noon: صباح الخير / مساء الخير.
+  const greetingAr = hour < 12 ? "صباح الخير" : "مساء الخير";
+  const greetingEn = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+  const isArabic = /^ar\b/i.test(String(locale || ""));
+  const greeting = isArabic ? greetingAr : greetingEn;
   return {
     date: fmt({ year: "numeric", month: "long", day: "numeric" }),
     shortdate: fmt({ year: "numeric", month: "2-digit", day: "2-digit" }),
@@ -60,7 +64,9 @@ export function builtinVars(now = new Date(), opts = {}) {
     day: fmt({ weekday: "long" }),
     month: fmt({ month: "long" }),
     year: fmt({ year: "numeric" }),
-    greeting,
+    greeting,          // locale-aware (Arabic when vars.locale is ar-*)
+    greeting_ar: greetingAr, // always Arabic
+    greeting_en: greetingEn, // always English
   };
 }
 
