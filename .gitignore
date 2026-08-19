@@ -18,3 +18,8 @@ blocklist.json
 templates.json
 conversions.jsonl
 contact-lists.json
+
+# runtime logs
+*.log
+launch-debug.log
+watitool.app.log

@@ -1,33 +1,115 @@
 {
-  "_comment": "Visual flows built in the Flow Builder tab. Each flow has a trigger (keywords) plus nodes (trigger/message/menu/question/condition/delay/end) and edges connecting their ports. The engine compiles this graph to run it.",
   "flows": [
     {
       "id": "main",
       "name": "Main menu",
-      "enabled": true,
-      "trigger": { "keywords": ["menu", "hi", "hello", "start", "help"], "match": "contains" },
+      "enabled": false,
+      "trigger": {
+        "keywords": [
+          "menu",
+          "hi",
+          "hello",
+          "start",
+          "help"
+        ],
+        "match": "contains"
+      },
       "nodes": [
-        { "id": "trigger", "type": "trigger", "x": 40, "y": 180, "data": {} },
-        { "id": "welcome", "type": "menu", "x": 280, "y": 140, "data": {
-          "text": "Hi {{name}}! 👋 How can we help you today?\n\n1️⃣ Products\n2️⃣ Talk to support\n3️⃣ Opening hours\n\n_Reply with a number._",
-          "options": [
-            { "label": "Products", "match": "1, products, catalog" },
-            { "label": "Support", "match": "2, support, help" },
-            { "label": "Hours", "match": "3, hours, open" }
-          ],
-          "fallback": "Please reply with 1, 2 or 3 🙂"
-        } },
-        { "id": "products", "type": "end", "x": 620, "y": 40, "data": { "text": "Great choice! Here's our latest catalog 📦\nReply *menu* anytime to start over." } },
-        { "id": "support", "type": "question", "x": 620, "y": 180, "data": { "text": "Sure 🙌 Please type your question and our team will get back to you.", "var": "question" } },
-        { "id": "thanks", "type": "end", "x": 900, "y": 180, "data": { "text": "Thank you {{name}}! ✅ We received:\n\n\"{{question}}\"\n\nOur team will reply within 24h. 🙏" } },
-        { "id": "hours", "type": "end", "x": 620, "y": 320, "data": { "text": "🕘 We're open *Sun–Thu, 9am–6pm*.\nReply *menu* to go back." } }
+        {
+          "id": "trigger",
+          "type": "trigger",
+          "x": 40,
+          "y": 180,
+          "data": {}
+        },
+        {
+          "id": "welcome",
+          "type": "menu",
+          "x": 280,
+          "y": 140,
+          "data": {
+            "text": "Hi {{name}}! 👋 How can we help you today?\n\n1️⃣ Products\n2️⃣ Talk to support\n3️⃣ Opening hours\n\n_Reply with a number._",
+            "options": [
+              {
+                "label": "Products",
+                "match": "1, products, catalog"
+              },
+              {
+                "label": "Support",
+                "match": "2, support, help"
+              },
+              {
+                "label": "Hours",
+                "match": "3, hours, open"
+              }
+            ],
+            "fallback": "Please reply with 1, 2 or 3 🙂"
+          }
+        },
+        {
+          "id": "products",
+          "type": "end",
+          "x": 620,
+          "y": 40,
+          "data": {
+            "text": "Great choice! Here's our latest catalog 📦\nReply *menu* anytime to start over."
+          }
+        },
+        {
+          "id": "support",
+          "type": "question",
+          "x": 620,
+          "y": 180,
+          "data": {
+            "text": "Sure 🙌 Please type your question and our team will get back to you.",
+            "var": "question"
+          }
+        },
+        {
+          "id": "thanks",
+          "type": "end",
+          "x": 900,
+          "y": 180,
+          "data": {
+            "text": "Thank you {{name}}! ✅ We received:\n\n\"{{question}}\"\n\nOur team will reply within 24h. 🙏"
+          }
+        },
+        {
+          "id": "hours",
+          "type": "end",
+          "x": 620,
+          "y": 320,
+          "data": {
+            "text": "🕘 We're open *Sun–Thu, 9am–6pm*.\nReply *menu* to go back."
+          }
+        }
       ],
       "edges": [
-        { "from": "trigger", "fromPort": "out", "to": "welcome" },
-        { "from": "welcome", "fromPort": "opt0", "to": "products" },
-        { "from": "welcome", "fromPort": "opt1", "to": "support" },
-        { "from": "welcome", "fromPort": "opt2", "to": "hours" },
-        { "from": "support", "fromPort": "out", "to": "thanks" }
+        {
+          "from": "trigger",
+          "fromPort": "out",
+          "to": "welcome"
+        },
+        {
+          "from": "welcome",
+          "fromPort": "opt0",
+          "to": "products"
+        },
+        {
+          "from": "welcome",
+          "fromPort": "opt1",
+          "to": "support"
+        },
+        {
+          "from": "welcome",
+          "fromPort": "opt2",
+          "to": "hours"
+        },
+        {
+          "from": "support",
+          "fromPort": "out",
+          "to": "thanks"
+        }
       ]
     }
   ]

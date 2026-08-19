@@ -10,7 +10,7 @@
     "_help": "Optional. Controls how {{date}}, {{time}}, {{day}} are formatted. e.g. locale \"ar-EG\" + timezone \"Africa/Cairo\" for Arabic dates in Cairo time. Leave empty to use the server's defaults."
   },
   "bot": {
-    "enabled": true,
+    "enabled": false,
     "replyInGroups": false,
     "cooldownSeconds": 5,
     "exitKeywords": [
@@ -32,8 +32,8 @@
   "countryCode": "20",
   "_countryCode_help": "Default country code added to numbers that don't already include one. 20 = Egypt, 966 = KSA, 971 = UAE, 1 = US/CA.",
   "delay": {
-    "minSeconds": 25,
-    "maxSeconds": 70,
+    "minSeconds": 40,
+    "maxSeconds": 90,
     "_help": "A RANDOM wait is picked between min and max after every message. Real people are not robots — never make this a fixed value."
   },
   "typing": {
@@ -44,8 +44,8 @@
     "_help": "Shows the 'typing…' indicator for a duration based on message length, so the contact sees a natural pause before the text lands."
   },
   "batch": {
-    "size": 40,
-    "restMinutes": 12,
+    "size": 30,
+    "restMinutes": 15,
     "_help": "After every <size> messages, take a longer break of <restMinutes>. Mimics a human taking a break and spreads load across the day."
   },
   "safety": {
@@ -70,7 +70,7 @@
       "_help": "Never message the same contact more than once within this many days (across all campaigns)."
     },
     "warmup": {
-      "enabled": false,
+      "enabled": true,
       "startPerDay": 20,
       "step": 20,
       "maxPerDay": 500,
