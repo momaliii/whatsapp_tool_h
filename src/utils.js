@@ -148,6 +148,7 @@ export function loadContacts(file) {
     columns: true,
     skip_empty_lines: true,
     trim: true,
+    relax_column_count: true, // a row missing the name (or extra columns) shouldn't abort the whole file
   });
   if (!rows.length) throw new Error(`No rows found in ${file}`);
   if (!("number" in rows[0]))

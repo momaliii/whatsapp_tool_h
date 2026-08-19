@@ -218,31 +218,47 @@ export async function runCampaign(client, opts = {}) {
 
 /** Send one message like a human: typing indicator, then the message. */
 async function sendHumanLike(client, jid, text, media, campaign, cfg, onPhase = noop) {
-  const chat = await client.getChatById(jid);
+  // Resolve the real WhatsApp id. Do NOT use getChatById to reach the contact:
+  // it throws a cryptic error (e.g. "r") for anyone you've never messaged from
+  // this number. getNumberId works for brand-new contacts and returns the
+  // correct wid; sendMessage then creates the chat on its own.
+  let sendId = jid;
+  try {
+    const numberId = await client.getNumberId(jid);
+    if (numberId?._serialized) sendId = numberId._serialized;
+    else throw new Error("not on WhatsApp");
+  } catch (e) {
+    if (e.message === "not on WhatsApp") throw e;
+    // getNumberId itself hiccupped — fall back to the raw jid and let sendMessage try.
+  }
 
+  // Typing indicator is best-effort: a missing chat must never abort the send.
   if (cfg.typing?.enabled && text) {
     onPhase("typing");
-    await chat.sendStateTyping();
-    const secs = Math.min(
-      cfg.typing.maxSeconds,
-      Math.max(cfg.typing.minSeconds, text.length / (cfg.typing.charsPerSecond || 8))
-    );
-    await sleep(secs * 1000);
-    await chat.clearState();
+    try {
+      const chat = await client.getChatById(sendId);
+      await chat.sendStateTyping();
+      const secs = Math.min(
+        cfg.typing.maxSeconds,
+        Math.max(cfg.typing.minSeconds, text.length / (cfg.typing.charsPerSecond || 8))
+      );
+      await sleep(secs * 1000);
+      await chat.clearState();
+    } catch {}
   }
 
   onPhase("sending");
   let sent;
   if (media) {
     if (campaign.sendCaptionAsSeparateText) {
-      sent = await client.sendMessage(jid, media);
+      sent = await client.sendMessage(sendId, media);
       await sleep(randInt(800, 2000));
-      if (text) sent = await client.sendMessage(jid, text);
+      if (text) sent = await client.sendMessage(sendId, text);
     } else {
-      sent = await client.sendMessage(jid, media, { caption: text || undefined });
+      sent = await client.sendMessage(sendId, media, { caption: text || undefined });
     }
   } else {
-    sent = await client.sendMessage(jid, text);
+    sent = await client.sendMessage(sendId, text);
   }
   return sent;
 }
