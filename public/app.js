@@ -118,8 +118,9 @@ function applyState(s) {
   if (p.name && p.phase !== "waiting") phase += ` · ${p.name}`;
   $("phase").textContent = phase;
 
-  // running controls
-  running = s.state === "running";
+  // running controls — key off campaignActive (survives a reconnect that flips
+  // state to "ready"), so Stop/Pause stay clickable while a campaign is sending.
+  running = s.state === "running" || !!s.campaignActive;
   $("btnStart").disabled = running;
   $("btnDryRun").disabled = running;
   $("btnStop").disabled = !running;

@@ -25,6 +25,10 @@ class Engine extends EventEmitter {
     this.qr = null;
     this.me = null; // {name, number}
     this.control = { stopped: false };
+    // True while a campaign loop is running. Independent of `this.state`, which a
+    // reconnect can flip to "ready" mid-campaign — relying on state to guard
+    // stop/pause/resume let a flapping connection break Stop and double-start sends.
+    this._campaignActive = false;
     this.progress = { index: 0, total: 0, name: "", phase: "idle", wait: 0 };
     this.stats = { sent: 0, failed: 0, skipped: 0, total: 0 };
     this.logs = [];
@@ -53,6 +57,7 @@ class Engine extends EventEmitter {
   snapshot() {
     return {
       state: this.state,
+      campaignActive: this._campaignActive,
       qr: this.qr,
       me: this.me,
       progress: this.progress,
@@ -96,7 +101,7 @@ class Engine extends EventEmitter {
   }
 
   pause() {
-    if (this.state !== "running" || !this.control) return;
+    if (!this._campaignActive || !this.control) return;
     this.control.paused = true;
     this.log("warn", "⏸ Paused — resume to continue.");
     this.emitUpdate();
@@ -163,12 +168,18 @@ class Engine extends EventEmitter {
   /** After (re)connect, resume a campaign that was interrupted by a crash/restart. */
   async maybeResume() {
     if (this.state !== "ready") return;
+    if (this._campaignActive) return; // a campaign is already running — never double-start
     let saved;
     try { saved = JSON.parse(fs.readFileSync(dataPath("active-campaign.json"), "utf8")); } catch { return; }
     if (!saved?.active || saved.dryRun) return;
     let cfg = {};
     try { cfg = loadJson("config.json"); } catch {}
-    if (cfg.safety?.autoResume === false) return;
+    // Opt-in only: auto-resume is OFF unless explicitly enabled, so a redeploy or
+    // reconnect never blasts a bulk campaign on its own.
+    if (cfg.safety?.autoResume !== true) {
+      this.log("warn", "↻ An interrupted campaign was found — click Resume to continue (auto-resume is off).");
+      return;
+    }
     this.log("info", "↻ Resuming an interrupted campaign (already-sent are skipped)…");
     this.run({ dryRun: false }).catch((e) => this.log("error", e.message));
   }
@@ -298,7 +309,9 @@ class Engine extends EventEmitter {
 
     client.on("ready", () => {
       this.qr = null;
-      this.state = "ready";
+      // Don't clobber a running campaign's state on reconnect — that used to
+      // break Stop (its guard) and let maybeResume start a second campaign.
+      if (!this._campaignActive) this.state = "ready";
       this._reconnecting = false;
       this._reconnectAttempts = 0;
       const info = client.info || {};
@@ -353,7 +366,7 @@ class Engine extends EventEmitter {
 
   /** Log out and forget the saved session. */
   async logout() {
-    if (this.state === "running") throw new Error("Stop the campaign first.");
+    if (this._campaignActive) throw new Error("Stop the campaign first.");
     if (this.client) {
       try { await this.client.logout(); } catch {}
       try { await this.client.destroy(); } catch {}
@@ -370,10 +383,11 @@ class Engine extends EventEmitter {
 
   /** Start a campaign. dryRun works without a live connection. */
   async run({ dryRun = false } = {}) {
-    if (this.state === "running") throw new Error("A campaign is already running.");
+    if (this._campaignActive) throw new Error("A campaign is already running.");
     if (!dryRun && this.state !== "ready")
       throw new Error("Connect to WhatsApp first (scan the QR).");
 
+    this._campaignActive = true;
     this.control = { stopped: false, paused: false };
     this.lastRunResults = [];
     this.state = "running";
@@ -417,6 +431,7 @@ class Engine extends EventEmitter {
         },
       });
     } finally {
+      this._campaignActive = false;
       // clear the crash-safe marker only if it finished/stopped cleanly (not a ban-pause auto-stop)
       if (!dryRun && !this._banPaused) this._setActiveCampaign(false);
       this.state = dryRun ? "disconnected" : "ready";
@@ -427,9 +442,11 @@ class Engine extends EventEmitter {
   }
 
   stop() {
-    if (this.state !== "running") return;
-    this.control.stopped = true;
-    this.log("warn", "Stopping…");
+    // Always propagate to the running loop's control — never gate on this.state,
+    // which a reconnect can flip to "ready" while a campaign is still sending.
+    if (this.control) this.control.stopped = true;
+    if (this._campaignActive) this.log("warn", "Stopping…");
+    this.emitUpdate();
   }
 
   // ---------- auto-reply / flow bot ----------
@@ -485,7 +502,7 @@ class Engine extends EventEmitter {
     const bot = config.bot || {};
     if (!bot.enabled) { this.log("warn", "🤖 auto-reply is OFF — enable it on the Auto-reply tab and Save."); return; }
     if (from.endsWith("@g.us") && !bot.replyInGroups) { this.log("info", "↳ group chat — ignored (groups disabled)."); return; }
-    if (this.state === "running") { this.log("info", "↳ ignored — a campaign is currently sending."); return; }
+    if (this._campaignActive) { this.log("info", "↳ ignored — a campaign is currently sending."); return; }
 
     // cooldown (skipped if the contact is mid-flow, so quick replies aren't lost)
     const inFlow = !!this.botStore.get(from);
