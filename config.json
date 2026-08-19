@@ -55,8 +55,8 @@
     "_maxPerRun_help": "Hard cap on messages per run (0 = no cap). Useful while warming up a new number.",
     "skipAlreadySent": true,
     "_skipAlreadySent_help": "Reads results.csv and never messages the same number twice. Makes the run fully resumable.",
-    "autoResume": true,
-    "_autoResume_help": "Crash-safe: if a campaign is interrupted (crash/restart/disconnect), resume it automatically once reconnected (already-sent are skipped).",
+    "autoResume": false,
+    "_autoResume_help": "OFF by default for safety. When true, a campaign interrupted by a crash/restart/disconnect resumes automatically once reconnected (already-sent are skipped). Leave false so a redeploy never blasts a bulk campaign on its own — click Resume manually instead.",
     "banGuard": {
       "enabled": true,
       "sampleSize": 8,

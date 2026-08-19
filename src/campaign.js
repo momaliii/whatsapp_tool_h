@@ -116,8 +116,12 @@ export async function runCampaign(client, opts = {}) {
     }`
   );
 
+  // Resolve the live client each time — a reconnect replaces the instance.
+  const getClient = opts.getClient || (() => client);
+  const connected = opts.isConnected || (() => true);
+
   if (cfg.onlinePresence && !dryRun) {
-    try { await client.sendPresenceAvailable(); } catch {}
+    try { await getClient().sendPresenceAvailable(); } catch {}
   }
 
   for (let i = 0; i < work.length; i++) {
@@ -131,6 +135,17 @@ export async function runCampaign(client, opts = {}) {
       await sleep(1000);
     }
     if (control.stopped) { on.log("warn", "Stopped by user."); break; }
+
+    // hold while the WhatsApp connection is down — never burn the rest of the
+    // list as "failed" during a temporary disconnect; resume when it's back.
+    let waitedForConn = false;
+    while (!control.stopped && !dryRun && !connected()) {
+      if (!waitedForConn) { on.log("warn", "⚠️ Connection lost — pausing the campaign until it's back…"); waitedForConn = true; }
+      on.progress({ index: i, total: work.length, stats, name: "reconnecting", phase: "reconnecting", wait: 0 });
+      await sleep(3000);
+    }
+    if (control.stopped) { on.log("warn", "Stopped by user."); break; }
+    if (waitedForConn) on.log("info", "✓ Connection restored — resuming the campaign.");
 
     // pause outside the allowed sending window
     if (cfg.schedule?.window?.enabled && !dryRun) {
@@ -156,8 +171,8 @@ export async function runCampaign(client, opts = {}) {
     on.progress({ index: i, total: work.length, stats, name, phase: "checking", wait: 0 });
 
     try {
-      if (cfg.safety?.checkRegistered && !dryRun) {
-        const ok = await client.isRegisteredUser(row._jid);
+      if (cfg.safety?.checkRegistered !== false && !dryRun) {
+        const ok = await getClient().isRegisteredUser(row._jid);
         if (!ok) {
           stats.skipped++;
           appendResult(row._number, name, "skipped", "not on WhatsApp");
@@ -172,7 +187,7 @@ export async function runCampaign(client, opts = {}) {
         appendResult(row._number, name, "dry-run", text.slice(0, 40));
         on.item({ number: row._number, name, status: "dry-run", detail: text.slice(0, 40) });
       } else {
-        const sentMsg = await sendHumanLike(client, row._jid, text, media, campaign, cfg, (phase) =>
+        const sentMsg = await sendHumanLike(getClient(), row._jid, text, media, campaign, cfg, (phase) =>
           on.progress({ index: i, total: work.length, stats, name, phase, wait: 0 })
         );
         stats.sent++;

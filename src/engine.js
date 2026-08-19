@@ -309,9 +309,10 @@ class Engine extends EventEmitter {
 
     client.on("ready", () => {
       this.qr = null;
-      // Don't clobber a running campaign's state on reconnect — that used to
-      // break Stop (its guard) and let maybeResume start a second campaign.
-      if (!this._campaignActive) this.state = "ready";
+      // Restore the correct state on reconnect: back to "running" if a campaign
+      // is still active (so the loop resumes on the fresh client), else "ready".
+      // Never leave it clobbered — that used to break Stop and double-start sends.
+      this.state = this._campaignActive ? "running" : "ready";
       this._reconnecting = false;
       this._reconnectAttempts = 0;
       const info = client.info || {};
@@ -401,6 +402,12 @@ class Engine extends EventEmitter {
     try {
       await runCampaign(this.client, {
         dryRun,
+        // Resolve the LIVE client each send: a reconnect swaps this.client for a
+        // new instance, so the campaign must never hold a stale/destroyed one.
+        getClient: () => this.client,
+        // Only "connected" once WhatsApp is truly ready — during "connecting"/
+        // "disconnected" the loop holds instead of sending on a half-ready client.
+        isConnected: () => !!this.client && (this.state === "running" || this.state === "ready"),
         control: this.control,
         on: {
           start: (stats) => {
